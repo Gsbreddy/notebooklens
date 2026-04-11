@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
@@ -29,11 +29,14 @@ from .github_api import CommentSyncResult, GitHubApiClient, claude_succeeded_fro
 SUPPORTED_EVENT_NAME = "pull_request"
 SUPPORTED_EVENT_ACTIONS = {"opened", "synchronize", "reopened"}
 NOTEBOOK_EXTENSION = ".ipynb"
+CONFIG_FILE_PATH = ".github/notebooklens.yml"
 
 
 @dataclass(frozen=True)
 class PullRequestContext:
     repository: str
+    base_repository: str
+    head_repository: str
     pull_number: int
     base_sha: str
     head_sha: str
@@ -83,6 +86,8 @@ class ActionRunResult:
     review_result: Optional[ReviewResult]
     notices: List[str]
     metadata: ActionRunMetadata
+    config_content: Optional[str]
+    config_notices: List[str] = field(default_factory=list)
 
 
 class GitHubNotebookApiClient(Protocol):
@@ -159,8 +164,15 @@ def load_pull_request_context(
     if head_repo_full_name:
         is_fork = is_fork or (head_repo_full_name != repository)
 
+    base_repo_full_name = _read_nested_str(payload, ("pull_request", "base", "repo", "full_name"))
+    if not base_repo_full_name:
+        base_repo_full_name = repository
+    head_repo_full_name = head_repo_full_name or repository
+
     return PullRequestContext(
         repository=repository,
+        base_repository=base_repo_full_name,
+        head_repository=head_repo_full_name,
         pull_number=pull_number,
         base_sha=base_sha,
         head_sha=head_sha,
@@ -203,10 +215,17 @@ def run_action(
             review_result=None,
             notices=[reason],
             metadata=_metadata_for_skip(action_inputs),
+            config_content=None,
+            config_notices=[],
         )
         if emit_logs:
             log_run_result(result)
         return result
+
+    config_content, config_notices = _fetch_notebooklens_config(
+        github_api=github_api,
+        context=pr_context,
+    )
 
     raw_files = github_api.list_pull_request_files(
         repository=pr_context.repository,
@@ -218,6 +237,8 @@ def run_action(
 
     if not notebook_files:
         reason = "No changed .ipynb files in pull request; exiting without review output."
+        notices = list(config_notices)
+        notices.append(reason)
         result = ActionRunResult(
             status="no_notebook_changes",
             skip_reason=reason,
@@ -225,8 +246,10 @@ def run_action(
             changed_notebook_paths=[],
             notebook_diff=None,
             review_result=None,
-            notices=[reason],
+            notices=notices,
             metadata=_metadata_for_skip(action_inputs),
+            config_content=config_content,
+            config_notices=list(config_notices),
         )
         if emit_logs:
             log_run_result(result)
@@ -250,7 +273,7 @@ def run_action(
     provider_meta = provider.last_run_metadata
     runtime_effective_provider = "none" if provider_meta.used_fallback else selected_provider
 
-    notices = []
+    notices = list(config_notices)
     notices.extend(discovery_notices)
     notices.extend(provider_notices)
     if provider_meta.used_fallback and provider_meta.fallback_reason:
@@ -290,6 +313,8 @@ def run_action(
         review_result=review_result,
         notices=list(notebook_diff.notices),
         metadata=metadata,
+        config_content=config_content,
+        config_notices=list(config_notices),
     )
     if emit_logs:
         log_run_result(result)
@@ -394,7 +419,7 @@ def _build_notebook_inputs(
         if should_fetch_content and selection.base_path is not None and not skip_head_for_size:
             base_content, base_notice = _safe_fetch_file_content(
                 github_api=github_api,
-                repository=context.repository,
+                repository=context.base_repository,
                 path=selection.base_path,
                 ref=context.base_sha,
             )
@@ -404,7 +429,7 @@ def _build_notebook_inputs(
         if should_fetch_content and selection.head_path is not None and not skip_head_for_size:
             head_content, head_notice = _safe_fetch_file_content(
                 github_api=github_api,
-                repository=context.repository,
+                repository=context.head_repository,
                 path=selection.head_path,
                 ref=context.head_sha,
             )
@@ -423,6 +448,23 @@ def _build_notebook_inputs(
         )
 
     return notebook_inputs, notices
+
+
+def _fetch_notebooklens_config(
+    *,
+    github_api: GitHubNotebookApiClient,
+    context: PullRequestContext,
+) -> Tuple[Optional[str], List[str]]:
+    content, notice = _safe_fetch_file_content(
+        github_api=github_api,
+        repository=context.head_repository,
+        path=CONFIG_FILE_PATH,
+        ref=context.head_sha,
+    )
+    notices: List[str] = []
+    if notice is not None:
+        notices.append(f"{CONFIG_FILE_PATH}: {notice}")
+    return content, notices
 
 
 def _safe_fetch_file_content(
