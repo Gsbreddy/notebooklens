@@ -168,6 +168,17 @@ def _reviewer_guidance_training_files() -> List[Dict[str, Any]]:
     ]
 
 
+def _renamed_reviewer_guidance_training_files() -> List[Dict[str, Any]]:
+    return [
+        {
+            "filename": "notebooks/training/churn_model.ipynb",
+            "previous_filename": "analysis/churn_model.ipynb",
+            "status": "renamed",
+            "size": 2_048,
+        }
+    ]
+
+
 def _readme_only_files() -> List[Dict[str, Any]]:
     return [
         {
@@ -199,6 +210,17 @@ def _contents_for_reviewer_guidance_training_notebook() -> Dict[Tuple[str, str],
     return {
         (path, "base-sha"): fixture_text("reviewer_guidance_training_base.ipynb"),
         (path, "head-sha"): fixture_text("reviewer_guidance_training_head.ipynb"),
+    }
+
+
+def _contents_for_renamed_reviewer_guidance_training_notebook() -> Dict[Tuple[str, str], Optional[str]]:
+    return {
+        ("analysis/churn_model.ipynb", "base-sha"): fixture_text(
+            "reviewer_guidance_training_base.ipynb"
+        ),
+        ("notebooks/training/churn_model.ipynb", "head-sha"): fixture_text(
+            "reviewer_guidance_training_head.ipynb"
+        ),
     }
 
 
@@ -409,6 +431,38 @@ def test_invalid_config_warns_once_and_continues_with_built_in_guidance() -> Non
     assert result.config_notices[0] in api.comments[0].body
 
 
+def test_same_repo_missing_config_stays_silent_and_keeps_built_in_guidance() -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_reviewer_guidance_training_files(),
+        contents_by_ref=_contents_for_reviewer_guidance_training_notebook(),
+    )
+    context = _context(is_fork=False)
+    inputs = ActionInputs(ai_provider="none", ai_api_key=None, redact_secrets=True, redact_emails=True)
+
+    result, sync_result = _run_and_sync(github_api=api, context=context, inputs=inputs)
+
+    assert result.status == "review_ready"
+    assert sync_result.action == "created"
+    assert result.config_content is None
+    assert result.config is None
+    assert result.config_notices == []
+    assert result.review_result is not None
+    assert [item.source for item in result.review_result.reviewer_guidance] == ["built_in"]
+    assert [item.message for item in result.review_result.reviewer_guidance] == [
+        (
+            "Inspect changed outputs for unexplained metric shifts, stale rendered "
+            "results, or outputs that now need updated narrative."
+        )
+    ]
+    assert (
+        "acme/notebooklens-fixture",
+        ".github/notebooklens.yml",
+        "head-sha",
+    ) in api.content_requests
+    assert ".github/notebooklens.yml" not in api.comments[0].body
+    assert "Training notebooks:" not in api.comments[0].body
+
+
 def test_run_action_fetches_config_from_fork_head_repository_and_sha() -> None:
     api = InMemoryGitHubApiClient(
         pr_files=_readme_only_files(),
@@ -459,6 +513,66 @@ def test_run_action_fetches_config_from_fork_head_repository_and_sha() -> None:
         ".github/notebooklens.yml",
         "head-sha",
     ) not in api.content_requests
+
+
+def test_fork_pr_head_config_participates_in_reviewer_guidance() -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_reviewer_guidance_training_files(),
+        contents_by_ref={
+            **_contents_for_reviewer_guidance_training_notebook(),
+            (".github/notebooklens.yml", "head-sha"): (
+                "version: 1\n"
+                "reviewer_guidance:\n"
+                "  playbooks:\n"
+                "    - name: Training notebooks\n"
+                "      paths:\n"
+                "        - notebooks/training/**/*.ipynb\n"
+                "      prompts:\n"
+                "        - Verify the dataset split and random seed changes are intentional.\n"
+            ),
+        },
+    )
+    context = PullRequestContext(
+        repository="acme/notebooklens-fixture",
+        base_repository="acme/notebooklens-fixture",
+        head_repository="contrib/notebooklens-fixture",
+        pull_number=42,
+        base_sha="base-sha",
+        head_sha="head-sha",
+        is_fork=True,
+        event_name="pull_request",
+        event_action="opened",
+    )
+    inputs = ActionInputs(ai_provider="none", ai_api_key=None, redact_secrets=True, redact_emails=True)
+
+    result, sync_result = _run_and_sync(github_api=api, context=context, inputs=inputs)
+
+    assert result.status == "review_ready"
+    assert sync_result.action == "created"
+    assert result.config is not None
+    assert [item.source for item in result.review_result.reviewer_guidance] == [
+        "built_in",
+        "playbook",
+    ]
+    assert (
+        "contrib/notebooklens-fixture",
+        ".github/notebooklens.yml",
+        "head-sha",
+    ) in api.content_requests
+    assert (
+        "acme/notebooklens-fixture",
+        "notebooks/training/churn_model.ipynb",
+        "base-sha",
+    ) in api.content_requests
+    assert (
+        "contrib/notebooklens-fixture",
+        "notebooks/training/churn_model.ipynb",
+        "head-sha",
+    ) in api.content_requests
+    assert (
+        "- Training notebooks: Verify the dataset split and random seed changes are intentional."
+        in api.comments[0].body
+    )
 
 
 def test_training_notebook_fixture_adds_output_guidance_and_playbook_prompts() -> None:
@@ -518,6 +632,82 @@ def test_training_notebook_fixture_adds_output_guidance_and_playbook_prompts() -
     assert (
         "- Training notebooks: Check whether metric changes are explained in markdown or the PR description."
     ) in body
+
+
+def test_renamed_notebook_matches_playbook_using_head_path() -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_renamed_reviewer_guidance_training_files(),
+        contents_by_ref={
+            **_contents_for_renamed_reviewer_guidance_training_notebook(),
+            (".github/notebooklens.yml", "head-sha"): (
+                "version: 1\n"
+                "reviewer_guidance:\n"
+                "  playbooks:\n"
+                "    - name: Training notebooks\n"
+                "      paths:\n"
+                "        - notebooks/training/**/*.ipynb\n"
+                "      prompts:\n"
+                "        - Verify the dataset split and random seed changes are intentional.\n"
+            ),
+        },
+    )
+    context = _context(is_fork=False)
+    inputs = ActionInputs(ai_provider="none", ai_api_key=None, redact_secrets=True, redact_emails=True)
+
+    result, sync_result = _run_and_sync(github_api=api, context=context, inputs=inputs)
+
+    assert result.status == "review_ready"
+    assert sync_result.action == "created"
+    assert result.changed_notebook_paths == ["notebooks/training/churn_model.ipynb"]
+    assert [item.notebook_path for item in result.review_result.reviewer_guidance] == [
+        "notebooks/training/churn_model.ipynb",
+        "notebooks/training/churn_model.ipynb",
+    ]
+    assert (
+        "acme/notebooklens-fixture",
+        "analysis/churn_model.ipynb",
+        "base-sha",
+    ) in api.content_requests
+    assert (
+        "acme/notebooklens-fixture",
+        "notebooks/training/churn_model.ipynb",
+        "head-sha",
+    ) in api.content_requests
+    body = api.comments[0].body
+    assert "#### `notebooks/training/churn_model.ipynb` (`modified`)" in body
+    assert "#### `analysis/churn_model.ipynb`" not in body
+    assert (
+        "- Training notebooks: Verify the dataset split and random seed changes are intentional."
+        in body
+    )
+
+
+def test_malformed_training_config_warns_once_and_skips_playbook_prompts() -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_reviewer_guidance_training_files(),
+        contents_by_ref={
+            **_contents_for_reviewer_guidance_training_notebook(),
+            (".github/notebooklens.yml", "head-sha"): (
+                "version: 1\n"
+                "reviewer_guidance: []\n"
+            ),
+        },
+    )
+    context = _context(is_fork=False)
+    inputs = ActionInputs(ai_provider="none", ai_api_key=None, redact_secrets=True, redact_emails=True)
+
+    result, sync_result = _run_and_sync(github_api=api, context=context, inputs=inputs)
+
+    assert result.status == "review_ready"
+    assert sync_result.action == "created"
+    assert result.config is None
+    assert len(result.config_notices) == 1
+    assert result.review_result is not None
+    assert [item.source for item in result.review_result.reviewer_guidance] == ["built_in"]
+    body = api.comments[0].body
+    assert body.count(".github/notebooklens.yml") == 1
+    assert "Continuing with built-in guidance only." in body
+    assert "Training notebooks:" not in body
 
 
 def test_stale_owned_marker_comment_is_deleted_when_notebook_changes_disappear() -> None:
