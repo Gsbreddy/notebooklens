@@ -1,0 +1,33 @@
+name: NotebookLens PR Example
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  notebooklens:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run NotebookLens (none mode first)
+        uses: your-org/notebooklens@v0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          ai-provider: none
+          redact-secrets: true
+          redact-emails: true
+
+      # Optional second step: enable Claude after none-mode baseline is validated.
+      # - name: Run NotebookLens (Claude mode)
+      #   uses: your-org/notebooklens@v0
+      #   env:
+      #     GITHUB_TOKEN: ${{ github.token }}
+      #   with:
+      #     ai-provider: claude
+      #     ai-api-key: ${{ secrets.AI_API_KEY }}
+      #     redact-secrets: true
+      #     redact-emails: true
