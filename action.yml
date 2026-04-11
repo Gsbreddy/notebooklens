@@ -1,0 +1,23 @@
+name: "NotebookLens"
+description: "GitHub-native notebook PR triage (v0.1.0). Docker action; supported on GitHub-hosted ubuntu-latest only."
+
+inputs:
+  ai-provider:
+    description: "AI provider to use for review enrichment. Options: none | claude."
+    required: false
+    default: "none"
+  ai-api-key:
+    description: "API key used only when ai-provider=claude."
+    required: false
+  redact-secrets:
+    description: "Redact secret-like values before any external AI call."
+    required: false
+    default: "true"
+  redact-emails:
+    description: "Redact email addresses before any external AI call."
+    required: false
+    default: "true"
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
