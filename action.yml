@@ -1,5 +1,10 @@
 name: "NotebookLens"
-description: "GitHub-native notebook PR triage (v0.1.0). Docker action; supported on GitHub-hosted ubuntu-latest only."
+author: "NotebookLens Contributors"
+description: "AI-powered notebook PR review and triage. Detects .ipynb changes, diffs cells, and posts auto-updating PR comments with optional Claude AI summaries."
+
+branding:
+  icon: "eye"
+  color: "blue"
 
 inputs:
   ai-provider:
@@ -17,6 +22,16 @@ inputs:
     description: "Redact email addresses before any external AI call."
     required: false
     default: "true"
+
+outputs:
+  effective-provider:
+    description: "Provider used for this run: none or claude."
+  changed-notebooks:
+    description: "Count of notebooks with detected changes in this pull request."
+  total-cells-changed:
+    description: "Total changed notebook cells across the reviewed pull request."
+  fallback-reason:
+    description: "Reason why NotebookLens fell back to none mode, or empty string when no fallback occurred."
 
 runs:
   using: "docker"

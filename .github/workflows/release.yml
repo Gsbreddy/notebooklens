@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version without a leading v, for example 0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate branch and version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Release workflow must run from main."
+            exit 1
+          fi
+
+          if ! printf '%s' "${VERSION}" | grep -Eq '^0\.[0-9]+\.[0-9]+$'; then
+            echo "Version must match 0.x.y"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest
+
+      - name: Build Docker action image
+        run: docker build -t notebooklens-release .
+
+      - name: Extract release notes from changelog
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = re.compile(
+              rf"^## \[{re.escape(version)}\](?: - .+)?\n(.*?)(?=^## \[|\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          match = pattern.search(changelog)
+          if match is None:
+              sys.stderr.write(f"Could not find CHANGELOG entry for {version}.\n")
+              sys.exit(1)
+          notes = match.group(1).strip() + "\n"
+          pathlib.Path("release-notes.md").write_text(notes, encoding="utf-8")
+          PY
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          git fetch --tags origin
+
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            EXISTING_SHA="$(git rev-list -n 1 "${TAG}")"
+            if [ "${EXISTING_SHA}" != "${GITHUB_SHA}" ]; then
+              echo "Tag ${TAG} already exists at ${EXISTING_SHA}, not ${GITHUB_SHA}."
+              exit 1
+            fi
+          else
+            git tag -a "${TAG}" -m "Release ${TAG}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${TAG}"
+          fi
+
+      - name: Move floating v0 tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          git tag -fa "v0" -m "Release ${TAG}" "${GITHUB_SHA}"
+          git push --force origin "refs/tags/v0"
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --title "${TAG}" --notes-file release-notes.md
+          else
+            gh release create "${TAG}" --title "${TAG}" --notes-file release-notes.md --latest
+          fi

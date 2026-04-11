@@ -25,6 +25,24 @@ def fixture_text(name: str) -> str:
     return (FIXTURES_DIR / name).read_text(encoding="utf-8")
 
 
+def parse_github_output(path: Path) -> Dict[str, str]:
+    raw = path.read_text(encoding="utf-8")
+    lines = raw.splitlines()
+    parsed: Dict[str, str] = {}
+    index = 0
+    while index < len(lines):
+        header = lines[index]
+        key, delimiter = header.split("<<", 1)
+        index += 1
+        value_lines: List[str] = []
+        while index < len(lines) and lines[index] != delimiter:
+            value_lines.append(lines[index])
+            index += 1
+        parsed[key] = "\n".join(value_lines)
+        index += 1
+    return parsed
+
+
 @dataclass
 class InMemoryGitHubApiClient(GitHubApiClient):
     pr_files: List[Dict[str, Any]]
@@ -458,6 +476,168 @@ def test_run_action_from_env_executes_full_runtime_and_upserts_comment() -> None
     assert sync_result.action == "created"
     assert len(api.comments) == 1
     assert "## NotebookLens" in api.comments[0].body
+
+
+def test_run_action_from_env_writes_outputs_for_review_ready(tmp_path: Path) -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_modified_notebook_files(),
+        contents_by_ref=_contents_for_modified_notebook(),
+    )
+    output_path = tmp_path / "github-output.txt"
+    env = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": "acme/notebooklens-fixture",
+        "GITHUB_OUTPUT": str(output_path),
+        "INPUT_AI_PROVIDER": "none",
+        "INPUT_REDACT_SECRETS": "true",
+        "INPUT_REDACT_EMAILS": "true",
+    }
+    event_payload = {
+        "action": "opened",
+        "number": 42,
+        "pull_request": {
+            "base": {"sha": "base-sha"},
+            "head": {"sha": "head-sha", "repo": {"fork": False, "full_name": "acme/notebooklens-fixture"}},
+        },
+    }
+
+    result, sync_result = run_action_from_env(
+        env=env,
+        event_payload=event_payload,
+        github_api=api,
+        provider_factory=NoneProviderFactory(),
+        emit_logs=False,
+    )
+
+    outputs = parse_github_output(output_path)
+    assert result.status == "review_ready"
+    assert sync_result is not None
+    assert outputs == {
+        "effective-provider": "none",
+        "changed-notebooks": "1",
+        "total-cells-changed": str(result.notebook_diff.total_cells_changed),
+        "fallback-reason": "",
+    }
+
+
+def test_run_action_from_env_writes_outputs_for_no_notebook_changes(tmp_path: Path) -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_readme_only_files(),
+        contents_by_ref={},
+    )
+    output_path = tmp_path / "github-output.txt"
+    env = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": "acme/notebooklens-fixture",
+        "GITHUB_OUTPUT": str(output_path),
+        "INPUT_AI_PROVIDER": "none",
+    }
+    event_payload = {
+        "action": "opened",
+        "number": 42,
+        "pull_request": {
+            "base": {"sha": "base-sha"},
+            "head": {"sha": "head-sha", "repo": {"fork": False, "full_name": "acme/notebooklens-fixture"}},
+        },
+    }
+
+    result, sync_result = run_action_from_env(
+        env=env,
+        event_payload=event_payload,
+        github_api=api,
+        provider_factory=NoneProviderFactory(),
+        emit_logs=False,
+    )
+
+    outputs = parse_github_output(output_path)
+    assert result.status == "no_notebook_changes"
+    assert sync_result is not None
+    assert outputs == {
+        "effective-provider": "none",
+        "changed-notebooks": "0",
+        "total-cells-changed": "0",
+        "fallback-reason": "",
+    }
+
+
+def test_run_action_from_env_writes_outputs_for_unsupported_event(tmp_path: Path) -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_modified_notebook_files(),
+        contents_by_ref=_contents_for_modified_notebook(),
+    )
+    output_path = tmp_path / "github-output.txt"
+    env = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": "acme/notebooklens-fixture",
+        "GITHUB_OUTPUT": str(output_path),
+        "INPUT_AI_PROVIDER": "claude",
+        "INPUT_AI_API_KEY": "dummy-key",
+    }
+    event_payload = {
+        "action": "closed",
+        "number": 42,
+        "pull_request": {
+            "base": {"sha": "base-sha"},
+            "head": {"sha": "head-sha", "repo": {"fork": False, "full_name": "acme/notebooklens-fixture"}},
+        },
+    }
+
+    result, sync_result = run_action_from_env(
+        env=env,
+        event_payload=event_payload,
+        github_api=api,
+        provider_factory=NoneProviderFactory(),
+        emit_logs=False,
+    )
+
+    outputs = parse_github_output(output_path)
+    assert result.status == "unsupported_event"
+    assert sync_result is None
+    assert outputs == {
+        "effective-provider": "none",
+        "changed-notebooks": "0",
+        "total-cells-changed": "0",
+        "fallback-reason": "",
+    }
+
+
+def test_run_action_from_env_writes_outputs_for_fallback_case(tmp_path: Path) -> None:
+    api = InMemoryGitHubApiClient(
+        pr_files=_modified_notebook_files(),
+        contents_by_ref=_contents_for_modified_notebook(),
+    )
+    output_path = tmp_path / "github-output.txt"
+    env = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": "acme/notebooklens-fixture",
+        "GITHUB_OUTPUT": str(output_path),
+        "INPUT_AI_PROVIDER": "claude",
+        "INPUT_AI_API_KEY": "dummy-key",
+    }
+    event_payload = {
+        "action": "opened",
+        "number": 42,
+        "pull_request": {
+            "base": {"sha": "base-sha"},
+            "head": {"sha": "head-sha", "repo": {"fork": False, "full_name": "acme/notebooklens-fixture"}},
+        },
+    }
+
+    result, sync_result = run_action_from_env(
+        env=env,
+        event_payload=event_payload,
+        github_api=api,
+        provider_factory=FailingProviderFactory(),
+        emit_logs=False,
+    )
+
+    outputs = parse_github_output(output_path)
+    assert result.status == "review_ready"
+    assert sync_result is not None
+    assert outputs["effective-provider"] == "none"
+    assert outputs["changed-notebooks"] == "1"
+    assert outputs["total-cells-changed"] == str(result.notebook_diff.total_cells_changed)
+    assert "simulated provider failure" in outputs["fallback-reason"]
 
 
 def test_run_action_from_env_unsupported_event_does_not_sync_comments() -> None:

@@ -340,6 +340,7 @@ def run_action_from_env(
     )
 
     if run_result.status == "unsupported_event" or run_result.context is None:
+        _write_action_outputs(run_result, env_map)
         return run_result, None
 
     comment_sync = sync_review_comment(
@@ -360,6 +361,7 @@ def run_action_from_env(
             "details": comment_sync.details,
         }
         print(f"notebooklens.comment_sync {json.dumps(payload, sort_keys=True)}")
+    _write_action_outputs(run_result, env_map)
     return run_result, comment_sync
 
 
@@ -611,18 +613,34 @@ def _is_supported_pr_event(context: PullRequestContext) -> bool:
 def _metadata_for_skip(inputs: ActionInputs) -> ActionRunMetadata:
     return ActionRunMetadata(
         requested_provider=inputs.ai_provider,
-        effective_provider=inputs.ai_provider if inputs.ai_provider == "none" else "none",
+        effective_provider="none",
         claude_called=False,
-        used_fallback=inputs.ai_provider == "claude",
-        fallback_reason=(
-            "No provider execution in skipped run."
-            if inputs.ai_provider == "claude"
-            else None
-        ),
+        used_fallback=False,
+        fallback_reason=None,
         input_tokens=None,
         output_tokens=None,
         estimated_cost_usd=None,
     )
+
+
+def _write_action_outputs(result: ActionRunResult, env: Mapping[str, str]) -> None:
+    output_path = str(env.get("GITHUB_OUTPUT", "")).strip()
+    if not output_path:
+        return
+
+    outputs = {
+        "effective-provider": result.metadata.effective_provider,
+        "changed-notebooks": str(len(result.changed_notebook_paths)),
+        "total-cells-changed": str(
+            result.notebook_diff.total_cells_changed if result.notebook_diff is not None else 0
+        ),
+        "fallback-reason": result.metadata.fallback_reason or "",
+    }
+
+    with Path(output_path).open("a", encoding="utf-8") as handle:
+        for key, value in outputs.items():
+            delimiter = f"NOTEBOOKLENS_{key.replace('-', '_').upper()}_EOF"
+            handle.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
 def _merge_fallback_reason(

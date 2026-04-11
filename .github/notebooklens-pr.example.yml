@@ -12,8 +12,9 @@ jobs:
   notebooklens:
     runs-on: ubuntu-latest
     steps:
-      - name: Run NotebookLens (none mode first)
-        uses: your-org/notebooklens@v0
+      - id: notebooklens
+        name: Run NotebookLens (none mode first)
+        uses: Gsbreddy/notebooklens@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -23,11 +24,11 @@ jobs:
 
       # Optional second step: enable Claude after none-mode baseline is validated.
       # - name: Run NotebookLens (Claude mode)
-      #   uses: your-org/notebooklens@v0
+      #   uses: Gsbreddy/notebooklens@v0
       #   env:
       #     GITHUB_TOKEN: ${{ github.token }}
       #   with:
       #     ai-provider: claude
-      #     ai-api-key: ${{ secrets.AI_API_KEY }}
+      #     ai-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
       #     redact-secrets: true
       #     redact-emails: true

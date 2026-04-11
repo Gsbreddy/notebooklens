@@ -1,4 +1,5 @@
 # NotebookLens
+[![pytest](https://github.com/Gsbreddy/notebooklens/actions/workflows/ci.yml/badge.svg)](https://github.com/Gsbreddy/notebooklens/actions/workflows/ci.yml)
 
 GitHub Action for Jupyter notebook PR review. Detects `.ipynb` changes, diffs cells, and posts one auto-updating PR comment — with optional Claude AI summaries. No checkout required. `none` mode needs no external AI key.
 
@@ -21,7 +22,8 @@ jobs:
   notebooklens:
     runs-on: ubuntu-latest
     steps:
-      - name: Run NotebookLens
+      - id: notebooklens
+        name: Run NotebookLens
         uses: Gsbreddy/notebooklens@v0
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -126,6 +128,24 @@ NotebookLens runs as a Docker GitHub Action triggered only on `pull_request` eve
 
 `GITHUB_TOKEN` is passed via `env:`, not `with:`. It must have `contents: read` and `pull-requests: write` permissions. These are explicitly declared in the workflow `permissions:` block (see Quick Start).
 
+## Outputs
+
+Give the action step an `id` such as `id: notebooklens` if you want to read outputs in later workflow steps.
+
+| Output | Description |
+|---|---|
+| `effective-provider` | Provider actually used for the run: `none` or `claude`. |
+| `changed-notebooks` | Count of notebooks with detected changes in the PR. |
+| `total-cells-changed` | Total changed notebook cells across all reviewed notebooks. |
+| `fallback-reason` | Reason why Claude fell back to `none`, or an empty string when no fallback occurred. |
+
+```yaml
+- name: Print NotebookLens summary
+  run: |
+    echo "Provider: ${{ steps.notebooklens.outputs.effective-provider }}"
+    echo "Changed notebooks: ${{ steps.notebooklens.outputs.changed-notebooks }}"
+```
+
 **Out of scope for v0.1.0:** OpenAI/Ollama providers, GitLab/Bitbucket, hosted review UI, inline notebook threads.
 
 ## Hard Limits
@@ -229,12 +249,19 @@ Unsupported events do not emit `notebooklens.comment_sync` because comment sync 
 - Check the `notebooklens.runtime` log line: `used_fallback: true` and `fallback_reason` will contain the specific cause.
 
 `Action fails immediately with an import error or ModuleNotFoundError`
-- This is unexpected for the current Docker action because the shipped runtime modules use the Python standard library only.
-- If you hit this while customizing the image locally, compare your Dockerfile and copied files against the published `action.yml` and `Dockerfile` first.
+- The published Docker action installs its declared Python dependencies during image build.
+- If you are customizing the image locally, ensure dependency installation runs before the entrypoint and that both `pyproject.toml` and `src/` are copied into the build context.
 
 ## Example Workflow File
 
 See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) for a runnable baseline.
+
+## Project Docs
+
+- [CHANGELOG.md](CHANGELOG.md) for release notes
+- [SECURITY.md](SECURITY.md) for vulnerability reporting
+- [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release process
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations
 
 ## License
 
