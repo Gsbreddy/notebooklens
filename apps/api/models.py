@@ -68,11 +68,21 @@ class InstallationAccountType(str, Enum):
     ORGANIZATION = "organization"
 
 
+class GitHubHostKind(str, Enum):
+    GITHUB_COM = "github_com"
+    GHES = "ghes"
+
+
 class ManagedReviewStatus(str, Enum):
     PENDING = "pending"
     READY = "ready"
     FAILED = "failed"
     CLOSED = "closed"
+
+
+class ManagedAiGatewayProviderKind(str, Enum):
+    NONE = "none"
+    LITELLM = "litellm"
 
 
 class SnapshotBuildJobStatus(str, Enum):
@@ -122,6 +132,11 @@ class GitHubInstallation(TimestampMixin, Base):
     repositories: Mapped[list["InstallationRepository"]] = relationship(
         back_populates="installation",
         cascade="all, delete-orphan",
+    )
+    managed_ai_gateway_config: Mapped["ManagedAiGatewayConfig | None"] = relationship(
+        back_populates="installation",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
 
 
@@ -409,6 +424,50 @@ class ReviewAsset(Base):
     snapshot: Mapped[ReviewSnapshot] = relationship(back_populates="review_assets")
 
 
+class ManagedAiGatewayConfig(Base):
+    __tablename__ = "managed_ai_gateway_configs"
+    __table_args__ = (
+        UniqueConstraint("installation_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    installation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("github_installations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider_kind: Mapped[ManagedAiGatewayProviderKind] = mapped_column(
+        SqlEnum(ManagedAiGatewayProviderKind, native_enum=False),
+        nullable=False,
+    )
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    github_host_kind: Mapped[GitHubHostKind] = mapped_column(
+        SqlEnum(GitHubHostKind, native_enum=False),
+        nullable=False,
+    )
+    github_api_base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    github_web_base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    api_key_header_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    static_headers_encrypted_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    use_responses_api: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    litellm_virtual_key_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_by_github_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+        nullable=False,
+    )
+
+    installation: Mapped[GitHubInstallation] = relationship(
+        back_populates="managed_ai_gateway_config"
+    )
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
@@ -424,8 +483,11 @@ __all__ = [
     "ApiConfigurationError",
     "Base",
     "GitHubInstallation",
+    "GitHubHostKind",
     "InstallationAccountType",
     "InstallationRepository",
+    "ManagedAiGatewayConfig",
+    "ManagedAiGatewayProviderKind",
     "ManagedReview",
     "ManagedReviewStatus",
     "NotificationDeliveryState",

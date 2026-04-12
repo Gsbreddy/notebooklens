@@ -29,8 +29,11 @@ from apps.api.managed_github import ManagedCheckRun
 from apps.api.models import (
     Base,
     GitHubInstallation,
+    GitHubHostKind,
     InstallationAccountType,
     InstallationRepository,
+    ManagedAiGatewayConfig,
+    ManagedAiGatewayProviderKind,
     ManagedReview,
     ManagedReviewStatus,
     NotificationDeliveryState,
@@ -60,6 +63,7 @@ from apps.api.review_workspace import get_workspace_payload
 from apps.api.routes.auth import get_oauth_client
 from apps.api.routes.github import get_managed_github_client
 from apps.api.routes.repo_access import reset_repo_access_cache
+from apps.api.routes.settings import get_litellm_connection_tester
 from apps.api.worker import process_notification_delivery_once, process_retention_cleanup_once
 from apps.api.webhooks import GitHubWebhookVerificationError, sign_github_webhook, verify_github_webhook_signature
 
@@ -88,6 +92,7 @@ class FakeOAuthClient:
         *,
         users_by_token: dict[str, GitHubOAuthUser] | None = None,
         repo_access: dict[tuple[str, str, str], bool] | None = None,
+        org_owner_access: dict[tuple[str, str], bool] | None = None,
     ) -> None:
         self.exchange_calls: list[dict[str, Any]] = []
         self.users_by_token = dict(
@@ -101,7 +106,9 @@ class FakeOAuthClient:
             }
         )
         self.repo_access = dict(repo_access or {})
+        self.org_owner_access = dict(org_owner_access or {})
         self.repo_access_checks: list[tuple[str, str, str]] = []
+        self.org_owner_checks: list[tuple[str, str]] = []
 
     def build_authorize_url(self, *, client_id: str, redirect_uri: str, state: str, scopes=()):
         del scopes
@@ -129,6 +136,10 @@ class FakeOAuthClient:
     def can_access_repository(self, access_token: str, *, owner: str, repo: str) -> bool:
         self.repo_access_checks.append((access_token, owner, repo))
         return self.repo_access.get((access_token, owner, repo), True)
+
+    def is_org_owner(self, access_token: str, *, org: str) -> bool:
+        self.org_owner_checks.append((access_token, org))
+        return self.org_owner_access.get((access_token, org), False)
 
 
 class FakeResponse:
@@ -219,11 +230,24 @@ class FakeEmailClient:
         self.sent_messages.append(message)
 
 
+class FakeLiteLLMConnectionTester:
+    def __init__(self, *, should_fail: bool = False) -> None:
+        self.should_fail = should_fail
+        self.calls: list[dict[str, Any]] = []
+
+    def test_connection(self, **kwargs: Any) -> str:
+        self.calls.append(dict(kwargs))
+        if self.should_fail:
+            raise RuntimeError("boom")
+        return "/chat/completions" if not kwargs["use_responses_api"] else "/responses"
+
+
 def _env(database_url: str) -> dict[str, str]:
     return {
         "DATABASE_URL": database_url,
         "APP_BASE_URL": "https://notebooklens.test",
         "SESSION_SECRET": "test-session-secret",
+        "ENCRYPTION_KEY": "test-encryption-secret",
         "GITHUB_APP_ID": "12345",
         "GITHUB_APP_PRIVATE_KEY": TEST_PRIVATE_KEY.replace("\n", "\\n"),
         "GITHUB_WEBHOOK_SECRET": "webhook-secret",
@@ -575,11 +599,30 @@ def create_review_asset_fixture(settings: ApiSettings) -> str:
         return str(asset.id)
 
 
+def create_github_installation_fixture(
+    settings: ApiSettings,
+    *,
+    github_installation_id: int = 11,
+    account_login: str = "octo-org",
+    account_type: InstallationAccountType = InstallationAccountType.ORGANIZATION,
+) -> str:
+    with session_scope(settings) as db_session:
+        installation = GitHubInstallation(
+            github_installation_id=github_installation_id,
+            account_login=account_login,
+            account_type=account_type,
+        )
+        db_session.add(installation)
+        db_session.flush()
+        return str(installation.id)
+
+
 def test_api_settings_load_and_normalize_private_key(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     assert settings.snapshot_retention_days == 90
     assert settings.managed_review_beta_enabled is True
     assert settings.app_base_url == "https://notebooklens.test"
+    assert settings.encryption_key == "test-encryption-secret"
     assert "BEGIN RSA PRIVATE KEY" in settings.github_app_private_key
     assert "\\n" not in settings.github_app_private_key
 
@@ -757,6 +800,7 @@ def test_managed_api_metadata_and_migration_scaffold_exist() -> None:
     expected_tables = {
         "github_installations",
         "installation_repositories",
+        "managed_ai_gateway_configs",
         "managed_reviews",
         "notification_outbox",
         "review_assets",
@@ -776,6 +820,9 @@ def test_managed_api_metadata_and_migration_scaffold_exist() -> None:
     ).exists()
     assert Path(
         "apps/api/alembic/versions/20260412_0003_add_review_assets.py"
+    ).exists()
+    assert Path(
+        "apps/api/alembic/versions/20260412_0004_add_managed_ai_gateway_configs.py"
     ).exists()
 
 
@@ -1486,6 +1533,219 @@ def test_review_assets_route_rejects_users_without_repo_access(tmp_path: Path) -
     assert response.status_code == 403
     assert response.json() == {"detail": "Repository access denied"}
     assert fake_oauth.repo_access_checks == [("gho_denied", "octo-org", "notebooklens")]
+
+    engine.dispose()
+
+
+def test_ai_gateway_settings_persist_encrypted_config_and_redact_secrets(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    installation_id = create_github_installation_fixture(settings)
+    app = create_app()
+    fake_oauth = FakeOAuthClient(org_owner_access={("gho_owner", "octo-org"): True})
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    session_id = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="octo-owner",
+        access_token="gho_owner",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, session_id)
+    payload = {
+        "provider_kind": "litellm",
+        "display_name": "Internal LiteLLM",
+        "github_host_kind": "github_com",
+        "github_api_base_url": "https://api.github.com",
+        "github_web_base_url": "https://github.com",
+        "base_url": "https://litellm.internal.example/v1",
+        "model_name": "gpt-4.1",
+        "api_key": "Bearer super-secret-token",
+        "api_key_header_name": "Authorization",
+        "static_headers": {"x-tenant-token": "tenant-secret"},
+        "use_responses_api": False,
+        "litellm_virtual_key_id": "vk-123",
+        "active": True,
+    }
+
+    put_response = client.put(
+        f"/api/settings/ai-gateway?installation_id={installation_id}",
+        json=payload,
+    )
+
+    assert put_response.status_code == 200
+    put_body = put_response.json()["config"]
+    assert put_body["provider_kind"] == "litellm"
+    assert put_body["has_api_key"] is True
+    assert put_body["static_header_names"] == ["x-tenant-token"]
+    assert "api_key" not in put_body
+    assert "static_headers" not in put_body
+
+    get_response = client.get(f"/api/settings/ai-gateway?installation_id={installation_id}")
+
+    assert get_response.status_code == 200
+    serialized = json.dumps(get_response.json())
+    assert "super-secret-token" not in serialized
+    assert "tenant-secret" not in serialized
+    assert fake_oauth.org_owner_checks == [
+        ("gho_owner", "octo-org"),
+        ("gho_owner", "octo-org"),
+    ]
+
+    with session_scope(settings) as db_session:
+        config = db_session.scalars(select(ManagedAiGatewayConfig)).one()
+        assert config.provider_kind == ManagedAiGatewayProviderKind.LITELLM
+        assert config.github_host_kind == GitHubHostKind.GITHUB_COM
+        assert config.api_key_encrypted != "Bearer super-secret-token"
+        assert config.static_headers_encrypted_json is not None
+        cipher = SessionTokenCipher(settings.encryption_key)
+        assert cipher.decrypt(config.api_key_encrypted) == "Bearer super-secret-token"
+        assert json.loads(cipher.decrypt(config.static_headers_encrypted_json)) == {
+            "x-tenant-token": "tenant-secret"
+        }
+
+    engine.dispose()
+
+
+def test_ai_gateway_settings_reject_non_admin_users(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    installation_id = create_github_installation_fixture(settings)
+    app = create_app()
+    fake_oauth = FakeOAuthClient(org_owner_access={("gho_member", "octo-org"): False})
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    session_id = create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="octo-member",
+        access_token="gho_member",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, session_id)
+
+    response = client.get(f"/api/settings/ai-gateway?installation_id={installation_id}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Installation admin access required"}
+    assert fake_oauth.org_owner_checks == [("gho_member", "octo-org")]
+    engine.dispose()
+
+
+def test_ai_gateway_settings_allow_user_owned_installation_admin_by_login(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    installation_id = create_github_installation_fixture(
+        settings,
+        github_installation_id=21,
+        account_login="octocat",
+        account_type=InstallationAccountType.USER,
+    )
+    app = create_app()
+    fake_oauth = FakeOAuthClient()
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    session_id = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="octocat",
+        access_token="gho_user_admin",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, session_id)
+
+    response = client.get(f"/api/settings/ai-gateway?installation_id={installation_id}")
+
+    assert response.status_code == 200
+    assert response.json()["config"]["provider_kind"] == "none"
+    assert fake_oauth.org_owner_checks == []
+    engine.dispose()
+
+
+def test_ai_gateway_test_route_can_reuse_stored_encrypted_secret(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    installation_id = create_github_installation_fixture(settings)
+    app = create_app()
+    fake_oauth = FakeOAuthClient(org_owner_access={("gho_owner", "octo-org"): True})
+    fake_tester = FakeLiteLLMConnectionTester()
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    app.dependency_overrides[get_litellm_connection_tester] = lambda: fake_tester
+    client = TestClient(app)
+
+    session_id = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="octo-owner",
+        access_token="gho_owner",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, session_id)
+    put_payload = {
+        "provider_kind": "litellm",
+        "display_name": "Internal LiteLLM",
+        "github_host_kind": "ghes",
+        "github_api_base_url": "https://ghes-api.example.test",
+        "github_web_base_url": "https://ghes.example.test",
+        "base_url": "https://litellm.internal.example/v1",
+        "model_name": "claude-sonnet",
+        "api_key": "Bearer reusable-secret",
+        "api_key_header_name": "Authorization",
+        "static_headers": {"x-tenant-token": "tenant-secret"},
+        "use_responses_api": True,
+        "litellm_virtual_key_id": "vk-456",
+        "active": False,
+    }
+    put_response = client.put(
+        f"/api/settings/ai-gateway?installation_id={installation_id}",
+        json=put_payload,
+    )
+    assert put_response.status_code == 200
+
+    test_payload = {
+        "provider_kind": "litellm",
+        "display_name": "Internal LiteLLM",
+        "github_host_kind": "ghes",
+        "github_api_base_url": "https://ghes-api.example.test",
+        "github_web_base_url": "https://ghes.example.test",
+        "base_url": "https://litellm.internal.example/v1",
+        "model_name": "claude-sonnet",
+        "api_key_header_name": "Authorization",
+        "use_responses_api": True,
+        "litellm_virtual_key_id": "vk-456",
+        "active": False,
+    }
+
+    response = client.post(
+        f"/api/settings/ai-gateway/test?installation_id={installation_id}",
+        json=test_payload,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "provider_kind": "litellm",
+        "model_name": "claude-sonnet",
+        "tested_endpoint": "/responses",
+    }
+    assert fake_tester.calls == [
+        {
+            "base_url": "https://litellm.internal.example/v1",
+            "model_name": "claude-sonnet",
+            "api_key_header_name": "Authorization",
+            "api_key": "Bearer reusable-secret",
+            "static_headers": {"x-tenant-token": "tenant-secret"},
+            "use_responses_api": True,
+        }
+    ]
 
     engine.dispose()
 

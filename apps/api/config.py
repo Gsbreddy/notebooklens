@@ -46,6 +46,7 @@ class ApiSettings:
     database_url: str
     app_base_url: str
     session_secret: str
+    encryption_key: str
     github_app_id: str
     github_app_private_key: str
     github_webhook_secret: str
@@ -68,6 +69,7 @@ class ApiSettings:
             database_url=_required(source, "DATABASE_URL"),
             app_base_url=_normalize_origin_url(source, "APP_BASE_URL"),
             session_secret=_required(source, "SESSION_SECRET"),
+            encryption_key=_required(source, "ENCRYPTION_KEY"),
             github_app_id=_required(source, "GITHUB_APP_ID"),
             github_app_private_key=private_key,
             github_webhook_secret=_required(source, "GITHUB_WEBHOOK_SECRET"),
