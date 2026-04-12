@@ -60,6 +60,8 @@ jobs:
 
 After install, NotebookLens adds one sticky PR comment. That comment is the entire OSS Action surface: it updates in place on new pushes, includes reviewer guidance even in `none` mode, and optionally includes Claude output when enabled.
 
+Want to preview the review surfaces before installing anything? See [docs/examples.md](docs/examples.md).
+
 For the full setup flow, validation checklist, and next steps like Claude mode or repo playbooks, use [docs/quickstart-action.md](docs/quickstart-action.md).
 
 ## Hosted Review Workspace Beta Quick Start
@@ -95,6 +97,8 @@ If you enable the hosted workspace beta, reviewers will also see:
 - snapshot history, notebook-aware diffs, inline threads, and GitHub PR sync for hosted thread activity
 
 The two surfaces are complementary, not duplicates: the Action is the lightweight GitHub-native summary path, and the hosted workspace beta is the deeper collaborative review path.
+
+Prefer static examples of both surfaces first? See [docs/examples.md](docs/examples.md).
 
 ## Enable Claude (optional)
 
@@ -381,6 +385,7 @@ See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) f
 - [docs/quickstart-workspace.md](docs/quickstart-workspace.md) for the hosted workspace beta quick start
 - [docs/privacy.md](docs/privacy.md) for data flow, permissions, fork behavior, and hard limits
 - [docs/troubleshooting.md](docs/troubleshooting.md) for common first-run and operator debugging paths
+- [docs/examples.md](docs/examples.md) for static OSS Action and hosted-workspace examples
 - [docs/self-hosting.md](docs/self-hosting.md) for the Docker Compose managed-workspace runbook
 - [docs/admin-ai-settings.md](docs/admin-ai-settings.md) for installation-scoped LiteLLM configuration
 - [docs/github-pr-sync.md](docs/github-pr-sync.md) for the GitHub mirror contract and fallback behavior

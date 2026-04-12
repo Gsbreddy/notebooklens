@@ -23,6 +23,8 @@ In the current `v0.4.0-beta` hosted workspace, reviewers can use:
 - installation-scoped LiteLLM settings for managed review
 - a supported Docker Compose self-hosting path for internal pilots
 
+Want to preview the hosted flow before setup? Use [examples.md](examples.md).
+
 ## Team quick start
 
 This is the shortest evaluator flow for a DS/ML team:

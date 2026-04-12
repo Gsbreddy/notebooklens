@@ -22,6 +22,8 @@ That comment can include:
 - notebook-local reviewer guidance
 - optional Claude summary output when `ai-provider: claude` succeeds
 
+Want to see a realistic static comment example before you install? Use [examples.md](examples.md).
+
 ## 1. Add the workflow
 
 Create a workflow like this:
