@@ -13,11 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Reviewer guidance playbooks via optional `.github/notebooklens.yml`, merged into notebook-local PR comment guidance sections.
 - Built-in reviewer guidance in `none` mode so changed notebooks receive actionable prompts without any external AI call.
+- Hosted PR-linked review workspace beta with notebook-aware diff rendering, snapshot history, and inline thread create/reply/resolve/reopen flows.
+- GitHub App onboarding plus GitHub OAuth sign-in for the managed review workspace.
+- Dedicated `NotebookLens Review Workspace` check run with snapshot status, hosted-review entrypoint, and thread-count summaries.
+- Versioned normalized snapshot storage for PR revisions, including thread carry-forward and `outdated` thread handling when anchors stop matching safely.
+- Hosted beta email notifications for thread-created, reply-added, resolved, and reopened events.
 
 ### Changed
 
 - Reviewer playbook config is read from the PR head revision, including fork PRs and renamed notebooks matched on their current head path.
 - Malformed reviewer-guidance config now falls back to built-in guidance with one visible PR comment notice instead of failing the run.
+- Public docs now separate OSS Action onboarding from GitHub App onboarding and clarify that both products can coexist on the same pull request.
+- Managed beta scope is now explicitly PR-only and deterministic-local-review-only, with no new public Action `with:` inputs.
 
 ## [0.1.0] - 2026-04-11
 
