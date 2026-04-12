@@ -118,6 +118,8 @@ def test_run_action_consumes_shared_review_core_boundary(monkeypatch: pytest.Mon
         github_api=api,
         context=github_action_module.PullRequestContext(
             repository="acme/notebooklens-fixture",
+            base_repository="acme/notebooklens-fixture",
+            head_repository="acme/notebooklens-fixture",
             pull_number=42,
             base_sha="base-sha",
             head_sha="head-sha",

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import glob
+from fnmatch import fnmatchcase
+from pathlib import PurePosixPath
 import re
 from typing import Iterable, Sequence
 
@@ -198,8 +199,27 @@ def _first_cell(notebook: NotebookFileDiff, predicate) -> CellChange | None:
 
 
 def _path_matches(path: str, pattern: str) -> bool:
-    regex = re.compile(glob.translate(pattern, recursive=True, include_hidden=True))
-    return bool(regex.match(path))
+    normalized_path = _normalize_posix_path(path)
+    normalized_pattern = _normalize_posix_path(pattern)
+    if not normalized_path or not normalized_pattern:
+        return False
+    for candidate in _match_patterns(normalized_pattern):
+        if fnmatchcase(normalized_path, candidate):
+            return True
+        if PurePosixPath(normalized_path).match(candidate):
+            return True
+    return False
+
+
+def _normalize_posix_path(value: str) -> str:
+    return value.replace("\\", "/").strip("/")
+
+
+def _match_patterns(pattern: str) -> tuple[str, ...]:
+    candidates = [pattern]
+    if "/**/" in pattern:
+        candidates.append(pattern.replace("/**/", "/", 1))
+    return tuple(dict.fromkeys(candidates))
 
 
 def _normalize_code_fragment(value: str) -> str:
