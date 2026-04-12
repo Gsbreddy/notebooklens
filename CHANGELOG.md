@@ -7,16 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Managed workspace operator docs for the supported Docker Compose self-hosting path, installation-scoped LiteLLM settings, and GitHub PR sync behavior in `v0.4.0-beta`.
-
-### Changed
-
-- CI now validates the managed `apps/api` and `apps/web` Docker image builds and renders `deploy/docker-compose.yml` against `deploy/.env.example`.
-- Hosted workspace README scope now reflects `v0.4.0-beta`: Docker Compose self-hosting for internal pilots, installation-scoped LiteLLM configuration, and one-way GitHub PR mirroring while NotebookLens remains the source of truth.
-
-## [0.3.0-beta] - 2026-04-12
+## [0.4.0-beta] - 2026-04-13
 
 ### Added
 
@@ -25,11 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dedicated `NotebookLens Review Workspace` check run with snapshot status, hosted-review entrypoint, and thread-count summaries.
 - Versioned normalized snapshot storage for PR revisions, including thread carry-forward and `outdated` thread handling when anchors stop matching safely.
 - Hosted beta email notifications for thread-created, reply-added, resolved, and reopened events.
+- Managed workspace operator docs for the supported Docker Compose self-hosting path, installation-scoped LiteLLM settings, and GitHub PR sync behavior in `v0.4.0-beta`.
 
 ### Changed
 
 - Public docs now separate OSS Action onboarding from GitHub App onboarding and clarify that both products can coexist on the same pull request.
 - Managed beta scope is now explicitly PR-only and deterministic-local-review-only, with no new public Action `with:` inputs.
+- CI now validates the managed `apps/api` and `apps/web` Docker image builds and renders `deploy/docker-compose.yml` against `deploy/.env.example`.
+- Hosted workspace README scope now reflects `v0.4.0-beta`: Docker Compose self-hosting for internal pilots, installation-scoped LiteLLM configuration, and one-way GitHub PR mirroring while NotebookLens remains the source of truth.
+- Managed package and web version surfaces are aligned on `0.4.0b0` / `0.4.0-beta`.
 
 ## [0.2.0] - 2026-04-12
 
