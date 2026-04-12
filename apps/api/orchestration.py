@@ -41,9 +41,14 @@ from .job_runner import (
     mark_snapshot_build_job_failed,
     mark_snapshot_build_job_succeeded,
 )
-from .managed_github import MANAGED_REVIEW_CHECK_RUN_NAME, ManagedGitHubClient
+from .managed_github import (
+    MANAGED_REVIEW_CHECK_RUN_NAME,
+    ManagedGitHubClient,
+    infer_github_host_metadata,
+)
 from .models import (
     GitHubInstallation,
+    GitHubMirrorAction,
     InstallationAccountType,
     InstallationRepository,
     ManagedAiGatewayConfig,
@@ -57,7 +62,11 @@ from .models import (
     SnapshotBuildJobStatus,
 )
 from .oauth import SessionCipherError, SessionTokenCipher
-from .review_workspace import carry_forward_open_threads, count_review_threads
+from .review_workspace import (
+    carry_forward_open_threads,
+    count_review_threads,
+    enqueue_github_mirror_job,
+)
 from .reviewer_guidance import (
     NotebookLensConfigError,
     ReviewerPlaybook,
@@ -344,6 +353,7 @@ def ingest_pull_request_webhook(
     installation, repository, review, reusable_check_run_id = _upsert_review_state(
         db_session=db_session,
         webhook=webhook,
+        github_client=github_client,
     )
 
     current_ready_snapshot = db_session.execute(
@@ -426,6 +436,11 @@ def ingest_pull_request_webhook(
         review=review,
         activity="Snapshot queued for the latest push.",
     )
+    enqueue_github_mirror_job(
+        db_session=db_session,
+        managed_review_id=review.id,
+        action=GitHubMirrorAction.UPSERT_WORKSPACE_COMMENT,
+    )
 
     db_session.flush()
     return WebhookIngestionResult(
@@ -495,6 +510,11 @@ def run_snapshot_build_worker_once(
                     f"Existing snapshot v{existing_ready_snapshot.snapshot_index} already matches "
                     f"head `{_short_sha(job.head_sha)}`."
                 ),
+            )
+            enqueue_github_mirror_job(
+                db_session=db_session,
+                managed_review_id=review.id,
+                action=GitHubMirrorAction.UPSERT_WORKSPACE_COMMENT,
             )
         else:
             check_run_id = review.latest_check_run_id
@@ -624,6 +644,11 @@ def run_snapshot_build_worker_once(
                     f"`{_short_sha(job.head_sha)}`."
                 ),
             )
+            enqueue_github_mirror_job(
+                db_session=db_session,
+                managed_review_id=review.id,
+                action=GitHubMirrorAction.UPSERT_WORKSPACE_COMMENT,
+            )
         mark_snapshot_build_job_succeeded(db_session, job)
         db_session.flush()
         return SnapshotBuildResult(
@@ -658,6 +683,11 @@ def run_snapshot_build_worker_once(
                 github_client=github_client,
                 review=review,
                 activity=f"Snapshot build failed for head `{_short_sha(job.head_sha)}`.",
+            )
+            enqueue_github_mirror_job(
+                db_session=db_session,
+                managed_review_id=review.id,
+                action=GitHubMirrorAction.UPSERT_WORKSPACE_COMMENT,
             )
         mark_snapshot_build_job_failed(
             db_session,
@@ -729,7 +759,9 @@ def _upsert_review_state(
     *,
     db_session: Session,
     webhook: PullRequestWebhook,
+    github_client: ManagedGitHubClient,
 ) -> tuple[GitHubInstallation, InstallationRepository, ManagedReview, int | None]:
+    github_host_kind, github_web_base_url = infer_github_host_metadata(github_client.api_base_url)
     installation = db_session.execute(
         select(GitHubInstallation).where(
             GitHubInstallation.github_installation_id == webhook.installation_id
@@ -789,6 +821,9 @@ def _upsert_review_state(
             latest_base_sha=webhook.base_sha,
             latest_head_sha=webhook.head_sha,
             status=ManagedReviewStatus.PENDING,
+            github_host_kind=github_host_kind,
+            github_api_base_url=github_client.api_base_url,
+            github_web_base_url=github_web_base_url,
         )
         db_session.add(review)
         db_session.flush()
@@ -804,6 +839,9 @@ def _upsert_review_state(
         review.latest_base_sha = webhook.base_sha
         review.latest_head_sha = webhook.head_sha
         review.status = ManagedReviewStatus.PENDING
+        review.github_host_kind = github_host_kind
+        review.github_api_base_url = github_client.api_base_url
+        review.github_web_base_url = github_web_base_url
 
     return installation, repository, review, reusable_check_run_id
 

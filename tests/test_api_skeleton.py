@@ -26,10 +26,13 @@ from apps.api.job_runner import (
     mark_snapshot_build_job_succeeded,
 )
 from apps.api.main import create_app
-from apps.api.managed_github import ManagedCheckRun
+from apps.api.managed_github import ManagedCheckRun, ManagedComment, ManagedGitHubClientError
 from apps.api.models import (
     Base,
     GitHubInstallation,
+    GitHubMirrorAction,
+    GitHubMirrorJob,
+    GitHubMirrorState,
     GitHubHostKind,
     InstallationAccountType,
     InstallationRepository,
@@ -60,12 +63,20 @@ from apps.api.oauth import (
     SessionTokenCipher,
 )
 from apps.api.orchestration import LiteLLMGatewayResponse, run_snapshot_build_worker_once
-from apps.api.review_workspace import get_workspace_payload, resolve_mirror_auth_context
+from apps.api.review_workspace import (
+    enqueue_github_mirror_job,
+    get_workspace_payload,
+    resolve_mirror_auth_context,
+)
 from apps.api.routes.auth import get_oauth_client
 from apps.api.routes.github import get_managed_github_client
 from apps.api.routes.repo_access import reset_repo_access_cache
 from apps.api.routes.settings import get_litellm_connection_tester
-from apps.api.worker import process_notification_delivery_once, process_retention_cleanup_once
+from apps.api.worker import (
+    process_github_mirror_job_once,
+    process_notification_delivery_once,
+    process_retention_cleanup_once,
+)
 from apps.api.webhooks import GitHubWebhookVerificationError, sign_github_webhook, verify_github_webhook_signature
 
 
@@ -175,12 +186,20 @@ class FakeManagedGitHubClient:
         files: list[dict[str, Any]] | None = None,
         contents: dict[tuple[str, str], str | None] | None = None,
         failing_content_keys: set[tuple[str, str]] | None = None,
+        api_base_url: str = "https://api.github.com",
     ) -> None:
+        self.api_base_url = api_base_url
         self.files = list(files or [])
         self.contents = dict(contents or {})
         self.failing_content_keys = set(failing_content_keys or set())
         self.check_run_calls: list[dict[str, Any]] = []
+        self.issue_comment_calls: list[dict[str, Any]] = []
+        self.review_comment_calls: list[dict[str, Any]] = []
+        self.issue_comments: dict[int, dict[str, Any]] = {}
+        self.review_comments: dict[int, dict[str, Any]] = {}
         self._next_check_run_id = 9000
+        self._next_issue_comment_id = 6000
+        self._next_review_comment_id = 7000
 
     def list_pull_request_files(
         self,
@@ -217,6 +236,149 @@ class FakeManagedGitHubClient:
         return ManagedCheckRun(
             check_run_id=check_run_id,
             html_url=f"https://github.example/check-runs/{check_run_id}",
+        )
+
+    def upsert_issue_comment(self, **kwargs: Any) -> ManagedComment:
+        comment_id = kwargs.get("comment_id")
+        if isinstance(comment_id, int) and comment_id in self.issue_comments:
+            return self.update_issue_comment(**kwargs)
+        return self.create_issue_comment(**kwargs)
+
+    def create_issue_comment(self, **kwargs: Any) -> ManagedComment:
+        self._next_issue_comment_id += 1
+        comment_id = self._next_issue_comment_id
+        body = str(kwargs["body"])
+        pull_number = int(kwargs["pull_number"])
+        repository = str(kwargs["repository"])
+        self.issue_comment_calls.append(
+            {
+                "op": "create",
+                "repository": repository,
+                "pull_number": pull_number,
+                "body": body,
+                "access_token": kwargs.get("access_token"),
+            }
+        )
+        self.issue_comments[comment_id] = {
+            "body": body,
+            "repository": repository,
+            "pull_number": pull_number,
+        }
+        return ManagedComment(
+            comment_id=comment_id,
+            html_url=f"https://github.example/{repository}/pull/{pull_number}#issuecomment-{comment_id}",
+        )
+
+    def update_issue_comment(self, **kwargs: Any) -> ManagedComment:
+        comment_id = int(kwargs["comment_id"])
+        record = self.issue_comments.get(comment_id)
+        if record is None:
+            raise ManagedGitHubClientError("issue comment not found", status_code=404)
+        body = str(kwargs["body"])
+        self.issue_comment_calls.append(
+            {
+                "op": "update",
+                "repository": kwargs["repository"],
+                "pull_number": kwargs.get("pull_number"),
+                "comment_id": comment_id,
+                "body": body,
+                "access_token": kwargs.get("access_token"),
+            }
+        )
+        record["body"] = body
+        return ManagedComment(
+            comment_id=comment_id,
+            html_url=f"https://github.example/{record['repository']}/pull/{record['pull_number']}#issuecomment-{comment_id}",
+        )
+
+    def upsert_review_comment(self, **kwargs: Any) -> ManagedComment:
+        comment_id = kwargs.get("comment_id")
+        if isinstance(comment_id, int) and comment_id in self.review_comments:
+            return self.update_review_comment(**kwargs)
+        return self._create_review_comment(**kwargs)
+
+    def _create_review_comment(self, **kwargs: Any) -> ManagedComment:
+        self._next_review_comment_id += 1
+        comment_id = self._next_review_comment_id
+        body = str(kwargs["body"])
+        repository = str(kwargs["repository"])
+        pull_number = int(kwargs["pull_number"])
+        self.review_comment_calls.append(
+            {
+                "op": "create_root",
+                "repository": repository,
+                "pull_number": pull_number,
+                "comment_id": comment_id,
+                "body": body,
+                "access_token": kwargs.get("access_token"),
+                "path": kwargs.get("path"),
+                "line": kwargs.get("line"),
+                "commit_id": kwargs.get("commit_id"),
+            }
+        )
+        self.review_comments[comment_id] = {
+            "body": body,
+            "repository": repository,
+            "pull_number": pull_number,
+            "path": kwargs.get("path"),
+            "line": kwargs.get("line"),
+            "parent_comment_id": None,
+        }
+        return ManagedComment(
+            comment_id=comment_id,
+            html_url=f"https://github.example/{repository}/pull/{pull_number}#discussion_r{comment_id}",
+        )
+
+    def create_review_comment_reply(self, **kwargs: Any) -> ManagedComment:
+        parent_comment_id = int(kwargs["comment_id"])
+        if parent_comment_id not in self.review_comments:
+            raise ManagedGitHubClientError("review comment not found", status_code=404)
+        self._next_review_comment_id += 1
+        comment_id = self._next_review_comment_id
+        body = str(kwargs["body"])
+        repository = str(kwargs["repository"])
+        pull_number = int(kwargs["pull_number"])
+        self.review_comment_calls.append(
+            {
+                "op": "create_reply",
+                "repository": repository,
+                "pull_number": pull_number,
+                "comment_id": comment_id,
+                "parent_comment_id": parent_comment_id,
+                "body": body,
+                "access_token": kwargs.get("access_token"),
+            }
+        )
+        self.review_comments[comment_id] = {
+            "body": body,
+            "repository": repository,
+            "pull_number": pull_number,
+            "parent_comment_id": parent_comment_id,
+        }
+        return ManagedComment(
+            comment_id=comment_id,
+            html_url=f"https://github.example/{repository}/pull/{pull_number}#discussion_r{comment_id}",
+        )
+
+    def update_review_comment(self, **kwargs: Any) -> ManagedComment:
+        comment_id = int(kwargs["comment_id"])
+        record = self.review_comments.get(comment_id)
+        if record is None:
+            raise ManagedGitHubClientError("review comment not found", status_code=404)
+        body = str(kwargs["body"])
+        self.review_comment_calls.append(
+            {
+                "op": "update",
+                "repository": kwargs["repository"],
+                "comment_id": comment_id,
+                "body": body,
+                "access_token": kwargs.get("access_token"),
+            }
+        )
+        record["body"] = body
+        return ManagedComment(
+            comment_id=comment_id,
+            html_url=f"https://github.example/{record['repository']}/pull/{record['pull_number']}#discussion_r{comment_id}",
         )
 
 
@@ -386,6 +548,23 @@ def run_managed_snapshot_worker(
         )
 
 
+def run_github_mirror_worker_until_idle(
+    *,
+    settings: ApiSettings,
+    github_client: FakeManagedGitHubClient,
+) -> list[Any]:
+    results: list[Any] = []
+    while True:
+        result = process_github_mirror_job_once(
+            settings=settings,
+            github_client=github_client,
+        )
+        results.append(result)
+        if result.status == "idle":
+            break
+    return results
+
+
 def review_row_for_cell(workspace: dict[str, Any], *, cell_id: str) -> dict[str, Any]:
     notebook = workspace["snapshot"]["payload"]["review"]["notebooks"][0]
     return next(item for item in notebook["render_rows"] if item["locator"]["cell_id"] == cell_id)
@@ -441,6 +620,43 @@ def review_thread_notebook(metric: str, *, explanation: str = "Baseline churn tr
             "nbformat": 4,
             "nbformat_minor": 5,
         }
+    )
+
+
+def review_metadata_thread_notebooks() -> tuple[str, str]:
+    return (
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "code",
+                        "id": "metric-cell",
+                        "source": "print('accuracy')",
+                        "metadata": {"tags": ["baseline"]},
+                        "outputs": [],
+                    }
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "code",
+                        "id": "metric-cell",
+                        "source": "print('accuracy')",
+                        "metadata": {"tags": ["baseline", "review-me"]},
+                        "outputs": [],
+                    }
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
     )
 
 
@@ -3340,5 +3556,312 @@ def test_snapshot_worker_carries_forward_open_threads_and_marks_outdated_when_an
     origin_workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7/snapshots/1").json()
     assert origin_workspace["threads"][0]["id"] == thread_id
     assert origin_workspace["threads"][0]["status"] == "outdated"
+
+    engine.dispose()
+
+
+def test_github_mirror_worker_syncs_native_review_comments_and_updates_in_place(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    app = create_app()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": REVIEW_WORKSPACE_THREAD_PATH,
+                "status": "modified",
+                "size": 2048,
+            }
+        ],
+        contents={
+            (REVIEW_WORKSPACE_THREAD_PATH, "base-sha"): fixture_text(
+                "review_workspace_thread_base.ipynb"
+            ),
+            (REVIEW_WORKSPACE_THREAD_PATH, "head-sha-1"): fixture_text(
+                "review_workspace_thread_head_v1.ipynb"
+            ),
+        },
+    )
+    fake_oauth = FakeOAuthClient(
+        users_by_token={
+            "reviewer-token": GitHubOAuthUser(
+                id=101,
+                login="reviewer",
+                email="reviewer@example.test",
+            ),
+            "reviewer-2-token": GitHubOAuthUser(
+                id=303,
+                login="reviewer-2",
+                email="reviewer2@example.test",
+            ),
+            "author-token": GitHubOAuthUser(
+                id=202,
+                login="pr-author",
+                email="author@example.test",
+            ),
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="reviewer-token",
+    )
+    reviewer_two_session = create_user_session(
+        settings,
+        github_user_id=303,
+        github_login="reviewer-2",
+        access_token="reviewer-2-token",
+    )
+    create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="pr-author",
+        access_token="author-token",
+    )
+
+    response = post_pull_request_webhook(
+        client,
+        payload=pull_request_payload(head_sha="head-sha-1"),
+        delivery_id="mirror-delivery-1",
+    )
+    assert response.status_code == 202
+    run_managed_snapshot_worker(settings=settings, github_client=fake_github)
+    initial_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in initial_results] == ["sent", "idle"]
+    assert fake_github.issue_comment_calls[0]["op"] == "create"
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7").json()
+    metric_row = review_row_for_cell(workspace, cell_id="metric-cell")
+    thread_response = client.post(
+        f"/api/reviews/{workspace['review']['id']}/threads",
+        json={
+            "snapshot_id": workspace["snapshot"]["id"],
+            "anchor": metric_row["thread_anchors"]["outputs"],
+            "body_markdown": "Explain the regression and update the notebook narrative.",
+        },
+    )
+    assert thread_response.status_code == 201
+    thread_id = thread_response.json()["thread"]["id"]
+
+    create_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in create_results] == ["sent", "idle"]
+    root_call = fake_github.review_comment_calls[0]
+    assert root_call["op"] == "create_root"
+    assert root_call["access_token"] == "reviewer-token"
+    assert root_call["path"] == REVIEW_WORKSPACE_THREAD_PATH
+    assert root_call["line"] > 0
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_two_session)
+    reply_response = client.post(
+        f"/api/threads/{thread_id}/messages",
+        json={"body_markdown": "The output still needs narrative context for the regression."},
+    )
+    assert reply_response.status_code == 201
+    with session_scope(settings) as db_session:
+        session_record = db_session.scalars(
+            select(UserSession).where(UserSession.github_user_id == 303)
+        ).one()
+        session_record.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+
+    reply_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in reply_results] == ["sent", "idle"]
+    reply_call = fake_github.review_comment_calls[1]
+    assert reply_call["op"] == "create_reply"
+    assert reply_call["access_token"] is None
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    assert client.post(f"/api/threads/{thread_id}/resolve").status_code == 200
+    resolve_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in resolve_results] == ["sent", "idle"]
+    resolve_call = fake_github.review_comment_calls[2]
+    assert resolve_call["op"] == "create_reply"
+    assert resolve_call["access_token"] is None
+    assert "NotebookLens resolved this thread" in resolve_call["body"]
+
+    assert client.post(f"/api/threads/{thread_id}/reopen").status_code == 200
+    reopen_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in reopen_results] == ["sent", "idle"]
+    reopen_call = fake_github.review_comment_calls[3]
+    assert reopen_call["op"] == "create_reply"
+    assert reopen_call["access_token"] is None
+    assert "NotebookLens reopened this thread" in reopen_call["body"]
+
+    with session_scope(settings) as db_session:
+        thread = db_session.scalars(select(ReviewThread)).one()
+        messages = db_session.scalars(
+            select(ThreadMessage).order_by(ThreadMessage.created_at.asc())
+        ).all()
+        review = db_session.scalars(select(ManagedReview)).one()
+        root_comment_id = thread.github_root_comment_id
+        assert root_comment_id is not None
+        assert thread.github_mirror_state == GitHubMirrorState.MIRRORED
+        assert thread.github_mirror_metadata_json["mode"] == "app"
+        assert thread.github_mirror_metadata_json["fallback_reason"] is None
+        assert thread.github_mirror_metadata_json["last_action"] == "reopened"
+        assert messages[1].github_reply_comment_id is not None
+        assert review.github_workspace_comment_id is not None
+        workspace_comment_id = review.github_workspace_comment_id
+        messages[0].body_markdown = "Updated explanation from NotebookLens."
+        enqueue_github_mirror_job(
+            db_session=db_session,
+            managed_review_id=review.id,
+            thread_id=thread.id,
+            thread_message_id=messages[0].id,
+            action=GitHubMirrorAction.CREATE_THREAD,
+        )
+
+    update_results = run_github_mirror_worker_until_idle(
+        settings=settings,
+        github_client=fake_github,
+    )
+    assert [result.status for result in update_results] == ["sent", "idle"]
+    update_call = fake_github.review_comment_calls[-1]
+    assert update_call["op"] == "update"
+    assert update_call["comment_id"] == root_comment_id
+    assert "Updated explanation from NotebookLens." in fake_github.review_comments[root_comment_id]["body"]
+
+    workspace_comment = fake_github.issue_comments[workspace_comment_id]
+    assert "[Open in NotebookLens](https://notebooklens.test/reviews/octo-org/notebooklens/pulls/7)" in workspace_comment["body"]
+    assert "### Fallback Threads" in workspace_comment["body"]
+    assert "None." in workspace_comment["body"]
+
+    engine.dispose()
+
+
+def test_github_mirror_worker_uses_workspace_comment_fallback_for_unmappable_metadata_threads(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    app = create_app()
+    metadata_path = "notebooks/training/metadata_only.ipynb"
+    base_notebook, head_notebook = review_metadata_thread_notebooks()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": metadata_path,
+                "status": "modified",
+                "size": 1024,
+            }
+        ],
+        contents={
+            (metadata_path, "base-sha"): base_notebook,
+            (metadata_path, "head-sha-metadata"): head_notebook,
+        },
+    )
+    fake_oauth = FakeOAuthClient(
+        users_by_token={
+            "reviewer-token": GitHubOAuthUser(
+                id=101,
+                login="reviewer",
+                email="reviewer@example.test",
+            ),
+            "author-token": GitHubOAuthUser(
+                id=202,
+                login="pr-author",
+                email="author@example.test",
+            ),
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="reviewer-token",
+    )
+    author_session = create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="pr-author",
+        access_token="author-token",
+    )
+
+    response = post_pull_request_webhook(
+        client,
+        payload=pull_request_payload(head_sha="head-sha-metadata"),
+        delivery_id="mirror-delivery-2",
+    )
+    assert response.status_code == 202
+    run_managed_snapshot_worker(settings=settings, github_client=fake_github)
+    run_github_mirror_worker_until_idle(settings=settings, github_client=fake_github)
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7").json()
+    row = review_row_for_cell(workspace, cell_id="metric-cell")
+    assert row["metadata"]["changed"] is True
+    thread_response = client.post(
+        f"/api/reviews/{workspace['review']['id']}/threads",
+        json={
+            "snapshot_id": workspace["snapshot"]["id"],
+            "anchor": row["thread_anchors"]["metadata"],
+            "body_markdown": "Please explain the metadata tag change.",
+        },
+    )
+    assert thread_response.status_code == 201
+    thread_id = thread_response.json()["thread"]["id"]
+    run_github_mirror_worker_until_idle(settings=settings, github_client=fake_github)
+
+    client.cookies.set(SESSION_COOKIE_NAME, author_session)
+    reply_response = client.post(
+        f"/api/threads/{thread_id}/messages",
+        json={"body_markdown": "I will add the reasoning in the next update."},
+    )
+    assert reply_response.status_code == 201
+    run_github_mirror_worker_until_idle(settings=settings, github_client=fake_github)
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    assert client.post(f"/api/threads/{thread_id}/resolve").status_code == 200
+    run_github_mirror_worker_until_idle(settings=settings, github_client=fake_github)
+
+    with session_scope(settings) as db_session:
+        thread = db_session.scalars(select(ReviewThread)).one()
+        review = db_session.scalars(select(ManagedReview)).one()
+        messages = db_session.scalars(
+            select(ThreadMessage).order_by(ThreadMessage.created_at.asc())
+        ).all()
+        assert thread.github_mirror_state == GitHubMirrorState.SKIPPED
+        assert thread.github_root_comment_id is None
+        assert thread.github_mirror_metadata_json["fallback_reason"] == "unmappable_anchor"
+        assert thread.status == ReviewThreadStatus.RESOLVED
+        assert all(message.github_reply_comment_id is None for message in messages)
+        workspace_comment_id = review.github_workspace_comment_id
+
+    assert fake_github.review_comment_calls == []
+    workspace_comment = fake_github.issue_comments[workspace_comment_id]
+    assert metadata_path in workspace_comment["body"]
+    assert "metadata" in workspace_comment["body"]
+    assert "Please explain the metadata tag change." in workspace_comment["body"]
+    assert "I will add the reasoning in the next update." in workspace_comment["body"]
+    assert "resolved" in workspace_comment["body"]
 
     engine.dispose()
