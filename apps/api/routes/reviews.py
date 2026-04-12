@@ -9,7 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..check_runs import sync_review_workspace_check_run
+from ..config import ApiSettings, get_settings
 from ..database import get_db_session
+from ..managed_github import ManagedGitHubClient
+from ..models import ReviewThreadStatus
 from ..oauth import GitHubOAuthClient, OAuthSessionStore
 from ..review_workspace import (
     ReviewWorkspaceNotFoundError,
@@ -25,6 +29,7 @@ from ..review_workspace import (
     serialize_thread,
 )
 from .auth import AuthenticatedUser, get_oauth_client, get_session_store, require_authenticated_user
+from .github import get_managed_github_client
 
 
 router = APIRouter(prefix="/api", tags=["reviews"])
@@ -107,6 +112,8 @@ def create_review_thread(
     request: CreateThreadRequest,
     current_user: AuthenticatedUser = Depends(require_authenticated_user),
     db_session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_settings),
+    github_client: ManagedGitHubClient = Depends(get_managed_github_client),
     oauth_client: GitHubOAuthClient = Depends(get_oauth_client),
     session_store: OAuthSessionStore = Depends(get_session_store),
 ) -> dict[str, Any]:
@@ -129,6 +136,17 @@ def create_review_thread(
             oauth_client=oauth_client,
             session_store=session_store,
         )
+        sync_review_workspace_check_run(
+            settings=settings,
+            db_session=db_session,
+            github_client=github_client,
+            review=review,
+            activity=_thread_activity(
+                actor_login=current_user.github_login,
+                notebook_path=_thread_notebook_path(thread),
+                action="created a thread on",
+            ),
+        )
         db_session.commit()
         return {"thread": serialize_thread(thread)}
     except ReviewWorkspaceNotFoundError as exc:
@@ -145,12 +163,15 @@ def create_thread_message(
     request: ThreadMessageRequest,
     current_user: AuthenticatedUser = Depends(require_authenticated_user),
     db_session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_settings),
+    github_client: ManagedGitHubClient = Depends(get_managed_github_client),
     oauth_client: GitHubOAuthClient = Depends(get_oauth_client),
     session_store: OAuthSessionStore = Depends(get_session_store),
 ) -> dict[str, Any]:
     try:
         thread = load_thread_by_id(db_session=db_session, thread_id=thread_id)
         review = thread.managed_review
+        previous_status = thread.status
         _ensure_repo_access(
             current_user=current_user,
             owner=review.owner,
@@ -165,6 +186,17 @@ def create_thread_message(
             body_markdown=request.body_markdown,
             oauth_client=oauth_client,
             session_store=session_store,
+        )
+        sync_review_workspace_check_run(
+            settings=settings,
+            db_session=db_session,
+            github_client=github_client,
+            review=review,
+            activity=_thread_activity(
+                actor_login=current_user.github_login,
+                notebook_path=_thread_notebook_path(updated_thread),
+                action="replied to a thread on",
+            ),
         )
         db_session.commit()
         return {"thread": serialize_thread(updated_thread)}
@@ -181,12 +213,15 @@ def resolve_thread_route(
     thread_id: str,
     current_user: AuthenticatedUser = Depends(require_authenticated_user),
     db_session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_settings),
+    github_client: ManagedGitHubClient = Depends(get_managed_github_client),
     oauth_client: GitHubOAuthClient = Depends(get_oauth_client),
     session_store: OAuthSessionStore = Depends(get_session_store),
 ) -> dict[str, Any]:
     try:
         thread = load_thread_by_id(db_session=db_session, thread_id=thread_id)
         review = thread.managed_review
+        previous_status = thread.status
         _ensure_repo_access(
             current_user=current_user,
             owner=review.owner,
@@ -201,6 +236,18 @@ def resolve_thread_route(
             oauth_client=oauth_client,
             session_store=session_store,
         )
+        if previous_status != ReviewThreadStatus.RESOLVED:
+            sync_review_workspace_check_run(
+                settings=settings,
+                db_session=db_session,
+                github_client=github_client,
+                review=review,
+                activity=_thread_activity(
+                    actor_login=current_user.github_login,
+                    notebook_path=_thread_notebook_path(updated_thread),
+                    action="resolved the thread on",
+                ),
+            )
         db_session.commit()
         return {"thread": serialize_thread(updated_thread)}
     except ReviewWorkspaceNotFoundError as exc:
@@ -213,12 +260,15 @@ def reopen_thread_route(
     thread_id: str,
     current_user: AuthenticatedUser = Depends(require_authenticated_user),
     db_session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_settings),
+    github_client: ManagedGitHubClient = Depends(get_managed_github_client),
     oauth_client: GitHubOAuthClient = Depends(get_oauth_client),
     session_store: OAuthSessionStore = Depends(get_session_store),
 ) -> dict[str, Any]:
     try:
         thread = load_thread_by_id(db_session=db_session, thread_id=thread_id)
         review = thread.managed_review
+        previous_status = thread.status
         _ensure_repo_access(
             current_user=current_user,
             owner=review.owner,
@@ -233,6 +283,18 @@ def reopen_thread_route(
             oauth_client=oauth_client,
             session_store=session_store,
         )
+        if previous_status == ReviewThreadStatus.RESOLVED:
+            sync_review_workspace_check_run(
+                settings=settings,
+                db_session=db_session,
+                github_client=github_client,
+                review=review,
+                activity=_thread_activity(
+                    actor_login=current_user.github_login,
+                    notebook_path=_thread_notebook_path(updated_thread),
+                    action="reopened the thread on",
+                ),
+            )
         db_session.commit()
         return {"thread": serialize_thread(updated_thread)}
     except ReviewWorkspaceNotFoundError as exc:
@@ -261,3 +323,15 @@ def _ensure_repo_access(
         _REPO_ACCESS_CACHE[cache_key] = (now + _ACCESS_CACHE_TTL, allowed)
     if not allowed:
         raise HTTPException(status_code=403, detail="Repository access denied")
+
+
+def _thread_notebook_path(thread: Any) -> str:
+    anchor = thread.anchor_json if isinstance(thread.anchor_json, dict) else {}
+    value = anchor.get("notebook_path")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "the notebook diff"
+
+
+def _thread_activity(*, actor_login: str, notebook_path: str, action: str) -> str:
+    return f"{actor_login} {action} `{notebook_path}`."

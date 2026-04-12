@@ -14,6 +14,11 @@ from src.claude_integration import NoneProvider
 from src.diff_engine import DiffLimits, NotebookInput
 from src.review_core import REVIEW_SNAPSHOT_SCHEMA_VERSION, ReviewCoreRequest, build_review_artifacts
 
+from .check_runs import (
+    build_review_url,
+    render_review_workspace_check_run_summary,
+    sync_review_workspace_check_run,
+)
 from .config import ApiSettings
 from .job_runner import (
     claim_next_snapshot_build_job,
@@ -33,7 +38,7 @@ from .models import (
     SnapshotBuildJob,
     SnapshotBuildJobStatus,
 )
-from .review_workspace import ThreadCounts, carry_forward_open_threads
+from .review_workspace import carry_forward_open_threads, count_review_threads
 from .reviewer_guidance import (
     NotebookLensConfigError,
     ReviewerPlaybook,
@@ -132,11 +137,12 @@ def ingest_pull_request_webhook(
         .limit(1)
     ).scalar_one_or_none()
 
-    details_url = _build_review_url(
+    details_url = build_review_url(
         settings=settings,
         review=review,
         snapshot_index=current_ready_snapshot.snapshot_index if current_ready_snapshot else None,
     )
+    thread_counts = count_review_threads(db_session=db_session, managed_review_id=review.id)
 
     job = _find_active_snapshot_job(
         db_session=db_session,
@@ -157,14 +163,16 @@ def ingest_pull_request_webhook(
             conclusion="neutral",
             details_url=details_url,
             external_id=str(review.id),
-            summary=_render_check_run_summary(
+            summary=render_review_workspace_check_run_summary(
                 review_url=details_url,
                 snapshot_status="ready",
                 activity=(
                     f"Existing snapshot v{current_ready_snapshot.snapshot_index} already matches "
                     "the latest push."
                 ),
-                thread_counts=_thread_counts(),
+                unresolved_threads=thread_counts.unresolved,
+                resolved_threads=thread_counts.resolved,
+                outdated_threads=thread_counts.outdated,
             ),
             check_run_id=reusable_check_run_id,
         )
@@ -187,11 +195,13 @@ def ingest_pull_request_webhook(
         status="in_progress",
         details_url=details_url,
         external_id=str(review.id),
-        summary=_render_check_run_summary(
+        summary=render_review_workspace_check_run_summary(
             review_url=details_url,
             snapshot_status="pending",
             activity="Snapshot queued for the latest push.",
-            thread_counts=_thread_counts(),
+            unresolved_threads=thread_counts.unresolved,
+            resolved_threads=thread_counts.resolved,
+            outdated_threads=thread_counts.outdated,
         ),
         check_run_id=reusable_check_run_id,
     )
@@ -264,13 +274,11 @@ def run_snapshot_build_worker_once(
         if _job_matches_latest_review(review=review, job=job):
             review.status = ManagedReviewStatus.READY
             review.latest_snapshot_id = existing_ready_snapshot.id
-            check_run_id = _update_check_run_for_snapshot(
+            check_run_id = sync_review_workspace_check_run(
                 settings=settings,
+                db_session=db_session,
                 github_client=github_client,
                 review=review,
-                repository=repository,
-                installation_id=installation.github_installation_id,
-                snapshot=existing_ready_snapshot,
                 activity=(
                     f"Existing snapshot v{existing_ready_snapshot.snapshot_index} already matches "
                     f"head `{_short_sha(job.head_sha)}`."
@@ -354,31 +362,16 @@ def run_snapshot_build_worker_once(
             )
             review.status = ManagedReviewStatus.READY
             review.latest_snapshot_id = snapshot.id
-            details_url = _build_review_url(
+            review.latest_check_run_id = sync_review_workspace_check_run(
                 settings=settings,
+                db_session=db_session,
+                github_client=github_client,
                 review=review,
-                snapshot_index=snapshot.snapshot_index,
-            )
-            review.latest_check_run_id = github_client.create_or_update_check_run(
-                settings=settings,
-                installation_id=installation.github_installation_id,
-                repository=repository.full_name,
-                head_sha=job.head_sha,
-                status="completed",
-                conclusion="neutral",
-                details_url=details_url,
-                external_id=str(review.id),
-                summary=_render_check_run_summary(
-                    review_url=details_url,
-                    snapshot_status="ready",
-                    activity=(
-                        f"Snapshot v{snapshot.snapshot_index} built for head "
-                        f"`{_short_sha(job.head_sha)}`."
-                    ),
-                    thread_counts=_thread_counts(),
+                activity=(
+                    f"Snapshot v{snapshot.snapshot_index} built for head "
+                    f"`{_short_sha(job.head_sha)}`."
                 ),
-                check_run_id=review.latest_check_run_id,
-            ).check_run_id
+            )
         mark_snapshot_build_job_succeeded(db_session, job)
         db_session.flush()
         return SnapshotBuildResult(
@@ -407,27 +400,13 @@ def run_snapshot_build_worker_once(
         snapshot.changed_cell_count = 0
         if _job_matches_latest_review(review=review, job=job):
             review.status = ManagedReviewStatus.FAILED
-            details_url = _build_review_url(settings=settings, review=review)
-            review.latest_check_run_id = github_client.create_or_update_check_run(
+            review.latest_check_run_id = sync_review_workspace_check_run(
                 settings=settings,
-                installation_id=installation.github_installation_id,
-                repository=repository.full_name,
-                head_sha=job.head_sha,
-                status="completed",
-                conclusion="action_required",
-                details_url=details_url,
-                external_id=str(review.id),
-                summary=_render_check_run_summary(
-                    review_url=details_url,
-                    snapshot_status="failed",
-                    activity=(
-                        f"Snapshot build failed for head `{_short_sha(job.head_sha)}`."
-                    ),
-                    thread_counts=_thread_counts(),
-                    failure_reason=failure_reason,
-                ),
-                check_run_id=review.latest_check_run_id,
-            ).check_run_id
+                db_session=db_session,
+                github_client=github_client,
+                review=review,
+                activity=f"Snapshot build failed for head `{_short_sha(job.head_sha)}`.",
+            )
         mark_snapshot_build_job_failed(
             db_session,
             job,
@@ -788,40 +767,6 @@ def _create_pending_snapshot(
     return snapshot
 
 
-def _update_check_run_for_snapshot(
-    *,
-    settings: ApiSettings,
-    github_client: ManagedGitHubClient,
-    review: ManagedReview,
-    repository: InstallationRepository,
-    installation_id: int,
-    snapshot: ReviewSnapshot,
-    activity: str,
-) -> int:
-    details_url = _build_review_url(
-        settings=settings,
-        review=review,
-        snapshot_index=snapshot.snapshot_index,
-    )
-    return github_client.create_or_update_check_run(
-        settings=settings,
-        installation_id=installation_id,
-        repository=repository.full_name,
-        head_sha=snapshot.head_sha,
-        status="completed",
-        conclusion="neutral",
-        details_url=details_url,
-        external_id=str(review.id),
-        summary=_render_check_run_summary(
-            review_url=details_url,
-            snapshot_status="ready",
-            activity=activity,
-            thread_counts=_thread_counts(),
-        ),
-        check_run_id=review.latest_check_run_id,
-    ).check_run_id
-
-
 def _load_reviewer_playbooks(config_text: str | None) -> tuple[tuple[ReviewerPlaybook, ...], list[str]]:
     if config_text is None:
         return (), []
@@ -831,50 +776,8 @@ def _load_reviewer_playbooks(config_text: str | None) -> tuple[tuple[ReviewerPla
         return (), [f"{_CONFIG_PATH}: invalid config ignored ({exc})"]
 
 
-def _render_check_run_summary(
-    *,
-    review_url: str,
-    snapshot_status: str,
-    activity: str,
-    thread_counts: ThreadCounts,
-    failure_reason: str | None = None,
-) -> str:
-    lines = [
-        f"[Open in NotebookLens]({review_url})",
-        f"Latest snapshot status: `{snapshot_status}`",
-        (
-            "Threads: "
-            f"{thread_counts.unresolved} unresolved, "
-            f"{thread_counts.resolved} resolved, "
-            f"{thread_counts.outdated} outdated"
-        ),
-        f"Activity: {activity}",
-    ]
-    if failure_reason:
-        lines.append(f"Failure: {failure_reason}")
-    return "\n".join(lines)
-
-
-def _build_review_url(
-    *,
-    settings: ApiSettings,
-    review: ManagedReview,
-    snapshot_index: int | None = None,
-) -> str:
-    base = (
-        f"{settings.app_base_url}/reviews/{review.owner}/{review.repo}/pulls/{review.pull_number}"
-    )
-    if snapshot_index is None:
-        return base
-    return f"{base}/snapshots/{snapshot_index}"
-
-
 def _job_matches_latest_review(*, review: ManagedReview, job: SnapshotBuildJob) -> bool:
     return review.latest_base_sha == job.base_sha and review.latest_head_sha == job.head_sha
-
-
-def _thread_counts() -> ThreadCounts:
-    return ThreadCounts()
 
 
 def _short_sha(value: str) -> str:

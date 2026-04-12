@@ -31,6 +31,7 @@ from apps.api.models import (
     InstallationRepository,
     ManagedReview,
     ManagedReviewStatus,
+    NotificationDeliveryState,
     NotificationOutbox,
     ReviewThread,
     ReviewThreadStatus,
@@ -53,6 +54,7 @@ from apps.api.oauth import (
 from apps.api.orchestration import run_snapshot_build_worker_once
 from apps.api.routes.auth import get_oauth_client
 from apps.api.routes.github import get_managed_github_client
+from apps.api.worker import process_notification_delivery_once
 from apps.api.webhooks import GitHubWebhookVerificationError, sign_github_webhook, verify_github_webhook_signature
 
 
@@ -194,6 +196,17 @@ class FakeManagedGitHubClient:
             check_run_id=check_run_id,
             html_url=f"https://github.example/check-runs/{check_run_id}",
         )
+
+
+class FakeEmailClient:
+    def __init__(self, *, failing_recipients: set[str] | None = None) -> None:
+        self.failing_recipients = set(failing_recipients or set())
+        self.sent_messages: list[Any] = []
+
+    def send_transactional_email(self, message: Any) -> None:
+        if message.to_email in self.failing_recipients:
+            raise RuntimeError(f"boom while emailing {message.to_email}")
+        self.sent_messages.append(message)
 
 
 def _env(database_url: str) -> dict[str, str]:
@@ -843,6 +856,15 @@ def test_review_workspace_routes_persist_threads_notifications_and_snapshot_hist
     thread = thread_response.json()["thread"]
     assert thread["status"] == "open"
     assert len(thread["messages"]) == 1
+    assert len(fake_github.check_run_calls) == 3
+    assert fake_github.check_run_calls[-1]["check_run_id"] == 9001
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in fake_github.check_run_calls[-1][
+        "summary"
+    ]
+    assert (
+        "Activity: reviewer created a thread on `analysis/notebook.ipynb`."
+        in fake_github.check_run_calls[-1]["summary"]
+    )
 
     with session_scope(settings) as db_session:
         stored_thread = db_session.scalars(select(ReviewThread)).one()
@@ -861,19 +883,45 @@ def test_review_workspace_routes_persist_threads_notifications_and_snapshot_hist
     )
     assert reply_response.status_code == 201
     assert len(reply_response.json()["thread"]["messages"]) == 2
+    assert len(fake_github.check_run_calls) == 4
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in fake_github.check_run_calls[-1][
+        "summary"
+    ]
+    assert (
+        "Activity: pr-author replied to a thread on `analysis/notebook.ipynb`."
+        in fake_github.check_run_calls[-1]["summary"]
+    )
 
     client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
     resolve_response = client.post(f"/api/threads/{thread['id']}/resolve")
     assert resolve_response.status_code == 200
     assert resolve_response.json()["thread"]["status"] == "resolved"
+    assert len(fake_github.check_run_calls) == 5
+    assert "Threads: 0 unresolved, 1 resolved, 0 outdated" in fake_github.check_run_calls[-1][
+        "summary"
+    ]
+    assert (
+        "Activity: reviewer resolved the thread on `analysis/notebook.ipynb`."
+        in fake_github.check_run_calls[-1]["summary"]
+    )
     second_resolve_response = client.post(f"/api/threads/{thread['id']}/resolve")
     assert second_resolve_response.status_code == 200
+    assert len(fake_github.check_run_calls) == 5
     reopen_response = client.post(f"/api/threads/{thread['id']}/reopen")
     assert reopen_response.status_code == 200
     assert reopen_response.json()["thread"]["status"] == "open"
+    assert len(fake_github.check_run_calls) == 6
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in fake_github.check_run_calls[-1][
+        "summary"
+    ]
+    assert (
+        "Activity: reviewer reopened the thread on `analysis/notebook.ipynb`."
+        in fake_github.check_run_calls[-1]["summary"]
+    )
     second_reopen_response = client.post(f"/api/threads/{thread['id']}/reopen")
     assert second_reopen_response.status_code == 200
     assert second_reopen_response.json()["thread"]["status"] == "open"
+    assert len(fake_github.check_run_calls) == 6
 
     snapshot_response = client.get("/api/reviews/octo-org/notebooklens/pulls/7/snapshots/1")
     assert snapshot_response.status_code == 200
@@ -895,6 +943,255 @@ def test_review_workspace_routes_persist_threads_notifications_and_snapshot_hist
         assert notifications[1].recipient_github_user_id == 101
         assert notifications[2].recipient_github_user_id == 202
         assert notifications[3].recipient_github_user_id == 202
+
+    engine.dispose()
+
+
+def test_notification_delivery_worker_sends_and_marks_pending_thread_event_emails(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    app = create_app()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": "analysis/notebook.ipynb",
+                "status": "modified",
+                "size": 2048,
+            }
+        ],
+        contents={
+            ("analysis/notebook.ipynb", "base-sha"): review_thread_notebook("0.81"),
+            ("analysis/notebook.ipynb", "head-sha-1"): review_thread_notebook("0.73"),
+        },
+    )
+    fake_oauth = FakeOAuthClient(
+        users_by_token={
+            "reviewer-token": GitHubOAuthUser(
+                id=101,
+                login="reviewer",
+                email="reviewer@example.test",
+            ),
+            "author-token": GitHubOAuthUser(
+                id=202,
+                login="pr-author",
+                email="author@example.test",
+            ),
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    payload = pull_request_payload(head_sha="head-sha-1")
+    body = json.dumps(payload).encode("utf-8")
+    response = client.post(
+        "/api/github/webhooks",
+        content=body,
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-1",
+            "X-Hub-Signature-256": sign_github_webhook("webhook-secret", body),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 202
+
+    with session_scope(settings) as db_session:
+        result = run_snapshot_build_worker_once(
+            settings=settings,
+            db_session=db_session,
+            github_client=fake_github,
+        )
+        assert result.status == "succeeded"
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="reviewer-token",
+    )
+    author_session = create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="pr-author",
+        access_token="author-token",
+    )
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7").json()
+    row = next(
+        item
+        for item in workspace["snapshot"]["payload"]["review"]["notebooks"][0]["render_rows"]
+        if item["outputs"]["changed"]
+    )
+    anchor = row["thread_anchors"]["outputs"]
+    thread_response = client.post(
+        f"/api/reviews/{workspace['review']['id']}/threads",
+        json={
+            "snapshot_id": workspace["snapshot"]["id"],
+            "anchor": anchor,
+            "body_markdown": "Explain the regression and update the notebook narrative.",
+        },
+    )
+    assert thread_response.status_code == 201
+    thread_id = thread_response.json()["thread"]["id"]
+
+    client.cookies.set(SESSION_COOKIE_NAME, author_session)
+    assert (
+        client.post(
+            f"/api/threads/{thread_id}/messages",
+            json={"body_markdown": "I will update the narrative in the next push."},
+        ).status_code
+        == 201
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    assert client.post(f"/api/threads/{thread_id}/resolve").status_code == 200
+    assert client.post(f"/api/threads/{thread_id}/reopen").status_code == 200
+
+    fake_email = FakeEmailClient()
+    delivery_result = process_notification_delivery_once(
+        settings=settings,
+        email_client=fake_email,
+        limit=10,
+    )
+    assert delivery_result.processed == 4
+    assert delivery_result.sent == 4
+    assert delivery_result.failed == 0
+    assert [message.subject for message in fake_email.sent_messages] == [
+        "[NotebookLens] New thread on octo-org/notebooklens#7",
+        "[NotebookLens] New reply on octo-org/notebooklens#7",
+        "[NotebookLens] Thread resolved on octo-org/notebooklens#7",
+        "[NotebookLens] Thread reopened on octo-org/notebooklens#7",
+    ]
+    assert "Open in NotebookLens: https://notebooklens.test/reviews/octo-org/notebooklens/pulls/7/snapshots/1" in fake_email.sent_messages[0].text_body
+
+    with session_scope(settings) as db_session:
+        notifications = db_session.scalars(
+            select(NotificationOutbox).order_by(NotificationOutbox.created_at.asc())
+        ).all()
+        assert [item.delivery_state for item in notifications] == [
+            NotificationDeliveryState.SENT,
+            NotificationDeliveryState.SENT,
+            NotificationDeliveryState.SENT,
+            NotificationDeliveryState.SENT,
+        ]
+        assert all(item.sent_at is not None for item in notifications)
+        assert all(item.attempt_count == 1 for item in notifications)
+
+    engine.dispose()
+
+
+def test_notification_delivery_worker_marks_failed_rows_when_email_send_errors(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    app = create_app()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": "analysis/notebook.ipynb",
+                "status": "modified",
+                "size": 2048,
+            }
+        ],
+        contents={
+            ("analysis/notebook.ipynb", "base-sha"): review_thread_notebook("0.81"),
+            ("analysis/notebook.ipynb", "head-sha-1"): review_thread_notebook("0.73"),
+        },
+    )
+    fake_oauth = FakeOAuthClient(
+        users_by_token={
+            "reviewer-token": GitHubOAuthUser(
+                id=101,
+                login="reviewer",
+                email="reviewer@example.test",
+            ),
+            "author-token": GitHubOAuthUser(
+                id=202,
+                login="pr-author",
+                email="author@example.test",
+            ),
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    payload = pull_request_payload(head_sha="head-sha-1")
+    body = json.dumps(payload).encode("utf-8")
+    response = client.post(
+        "/api/github/webhooks",
+        content=body,
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-1",
+            "X-Hub-Signature-256": sign_github_webhook("webhook-secret", body),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 202
+
+    with session_scope(settings) as db_session:
+        result = run_snapshot_build_worker_once(
+            settings=settings,
+            db_session=db_session,
+            github_client=fake_github,
+        )
+        assert result.status == "succeeded"
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="reviewer-token",
+    )
+    create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="pr-author",
+        access_token="author-token",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7").json()
+    row = next(
+        item
+        for item in workspace["snapshot"]["payload"]["review"]["notebooks"][0]["render_rows"]
+        if item["outputs"]["changed"]
+    )
+    anchor = row["thread_anchors"]["outputs"]
+    thread_response = client.post(
+        f"/api/reviews/{workspace['review']['id']}/threads",
+        json={
+            "snapshot_id": workspace["snapshot"]["id"],
+            "anchor": anchor,
+            "body_markdown": "Explain the regression and update the notebook narrative.",
+        },
+    )
+    assert thread_response.status_code == 201
+
+    fake_email = FakeEmailClient(failing_recipients={"author@example.test"})
+    delivery_result = process_notification_delivery_once(
+        settings=settings,
+        email_client=fake_email,
+        limit=10,
+    )
+    assert delivery_result.processed == 1
+    assert delivery_result.sent == 0
+    assert delivery_result.failed == 1
+
+    with session_scope(settings) as db_session:
+        notification = db_session.scalars(select(NotificationOutbox)).one()
+        assert notification.delivery_state == NotificationDeliveryState.FAILED
+        assert notification.sent_at is None
+        assert notification.attempt_count == 1
+        assert notification.last_error == "boom while emailing author@example.test"
 
     engine.dispose()
 
