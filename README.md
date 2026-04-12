@@ -26,6 +26,8 @@ Pick the Action first if your goal is "show me notebook-aware review inside GitH
 
 Recommended first install for most teams. It needs no AI key, sends nothing to external model providers in `none` mode, and still includes built-in reviewer guidance for changed notebooks.
 
+Prefer a step-by-step guide? Start with [docs/quickstart-action.md](docs/quickstart-action.md).
+
 ```yaml
 name: NotebookLens
 
@@ -58,17 +60,15 @@ jobs:
 
 After install, NotebookLens adds one sticky PR comment. That comment is the entire OSS Action surface: it updates in place on new pushes, includes reviewer guidance even in `none` mode, and optionally includes Claude output when enabled.
 
+For the full setup flow, validation checklist, and next steps like Claude mode or repo playbooks, use [docs/quickstart-action.md](docs/quickstart-action.md).
+
 ## Hosted Review Workspace Beta Quick Start
 
 The managed `v0.4.0-beta` workspace is a separate GitHub App + web app flow. It does not replace the OSS Action, and it does not add new public Action `with:` inputs.
 
+Prefer the DS/ML-team-first setup guide? Start with [docs/quickstart-workspace.md](docs/quickstart-workspace.md).
+
 Managed beta deployments use `APP_BASE_URL` as the shared public base URL for the hosted review UI and its `/api/...` routes.
-
-`v0.4.0-beta` adds a supported Docker Compose self-hosting path for internal pilots on GitHub.com and GitHub Enterprise Server (`3.20.0+`). Operator and admin docs:
-
-- [Self-hosting runbook](docs/self-hosting.md)
-- [LiteLLM admin settings](docs/admin-ai-settings.md)
-- [GitHub PR sync behavior](docs/github-pr-sync.md)
 
 1. Install the NotebookLens GitHub App on the repositories you want to review.
 2. Sign in to NotebookLens with GitHub OAuth.
@@ -78,11 +78,7 @@ Managed beta deployments use `APP_BASE_URL` as the shared public base URL for th
 
 The beta is still PR-only. This release does not support commit-only review, standalone notebook conversations, bidirectional GitHub sync back into NotebookLens, or Helm/Kubernetes packaging.
 
-Installation admins can now configure an installation-scoped LiteLLM gateway for managed review. If the gateway is unavailable, NotebookLens records the provider failure and falls back to deterministic local review.
-
-Hosted thread activity now mirrors into GitHub pull requests when NotebookLens can map the hosted anchor to a stable `.ipynb` diff position. The managed workspace remains the editable source of truth, and unmappable anchors fall back to the app-owned workspace comment on the PR discussion tab.
-
-To keep the hosted UI fast and stable across pushes, NotebookLens stores versioned normalized review snapshots per PR revision for 90 days by default. Those snapshots include changed-cell source text, limited neighboring context, output and metadata summaries, deterministic findings, reviewer guidance, and stable thread anchors. NotebookLens does not store untouched full notebook revisions wholesale for the hosted beta.
+For the full beta quick start, operator links, and deployment details, use [docs/quickstart-workspace.md](docs/quickstart-workspace.md).
 
 ## What You'll See
 
@@ -377,6 +373,8 @@ See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) f
 
 ## Project Docs
 
+- [docs/quickstart-action.md](docs/quickstart-action.md) for the shortest OSS Action install path
+- [docs/quickstart-workspace.md](docs/quickstart-workspace.md) for the hosted workspace beta quick start
 - [CHANGELOG.md](CHANGELOG.md) for release notes
 - [SECURITY.md](SECURITY.md) for vulnerability reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release process
