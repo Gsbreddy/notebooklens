@@ -284,6 +284,44 @@ def pull_request_payload(
     }
 
 
+def post_pull_request_webhook(
+    client: TestClient,
+    *,
+    payload: dict[str, Any],
+    delivery_id: str,
+) -> Any:
+    body = json.dumps(payload).encode("utf-8")
+    response = client.post(
+        "/api/github/webhooks",
+        content=body,
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": delivery_id,
+            "X-Hub-Signature-256": sign_github_webhook("webhook-secret", body),
+            "Content-Type": "application/json",
+        },
+    )
+    return response
+
+
+def run_managed_snapshot_worker(
+    *,
+    settings: ApiSettings,
+    github_client: FakeManagedGitHubClient,
+) -> Any:
+    with session_scope(settings) as db_session:
+        return run_snapshot_build_worker_once(
+            settings=settings,
+            db_session=db_session,
+            github_client=github_client,
+        )
+
+
+def review_row_for_cell(workspace: dict[str, Any], *, cell_id: str) -> dict[str, Any]:
+    notebook = workspace["snapshot"]["payload"]["review"]["notebooks"][0]
+    return next(item for item in notebook["render_rows"] if item["locator"]["cell_id"] == cell_id)
+
+
 def create_user_session(
     settings: ApiSettings,
     *,
@@ -757,6 +795,320 @@ def test_snapshot_worker_marks_failed_and_preserves_last_ready_snapshot(tmp_path
     assert failed_call["conclusion"] == "action_required"
     assert "Latest snapshot status: `failed`" in failed_call["summary"]
     assert "Failure: boom while fetching analysis/notebook.ipynb@head-sha-2" in failed_call["summary"]
+    engine.dispose()
+
+
+def test_churn_model_review_workspace_end_to_end_flow_covers_threads_notifications_and_carry_forward(
+    tmp_path: Path,
+) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    app = create_app()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": REVIEW_WORKSPACE_THREAD_PATH,
+                "status": "modified",
+                "size": 2048,
+            }
+        ],
+        contents={
+            (REVIEW_WORKSPACE_THREAD_PATH, "base-sha"): fixture_text(
+                "review_workspace_thread_base.ipynb"
+            ),
+            (REVIEW_WORKSPACE_THREAD_PATH, "head-sha-1"): fixture_text(
+                "review_workspace_thread_head_v1.ipynb"
+            ),
+            (REVIEW_WORKSPACE_THREAD_PATH, "head-sha-2"): fixture_text(
+                "review_workspace_thread_head_v2.ipynb"
+            ),
+        },
+    )
+    fake_oauth = FakeOAuthClient(
+        users_by_token={
+            "reviewer-token": GitHubOAuthUser(
+                id=101,
+                login="reviewer",
+                email="reviewer@example.test",
+            ),
+            "reviewer-2-token": GitHubOAuthUser(
+                id=303,
+                login="reviewer-2",
+                email="reviewer2@example.test",
+            ),
+            "author-token": GitHubOAuthUser(
+                id=202,
+                login="pr-author",
+                email="author@example.test",
+            ),
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="reviewer-token",
+    )
+    reviewer_two_session = create_user_session(
+        settings,
+        github_user_id=303,
+        github_login="reviewer-2",
+        access_token="reviewer-2-token",
+    )
+    create_user_session(
+        settings,
+        github_user_id=202,
+        github_login="pr-author",
+        access_token="author-token",
+    )
+
+    first_response = post_pull_request_webhook(
+        client,
+        payload=pull_request_payload(head_sha="head-sha-1"),
+        delivery_id="delivery-1",
+    )
+    assert first_response.status_code == 202
+    assert first_response.json()["status"] == "accepted"
+    assert first_response.json()["job_id"] is not None
+    assert first_response.json()["check_run_id"] == 9001
+    assert len(fake_github.check_run_calls) == 1
+    first_pending_call = fake_github.check_run_calls[-1]
+    assert first_pending_call["head_sha"] == "head-sha-1"
+    assert first_pending_call["status"] == "in_progress"
+    assert "Latest snapshot status: `pending`" in first_pending_call["summary"]
+    assert "Threads: 0 unresolved, 0 resolved, 0 outdated" in first_pending_call["summary"]
+
+    with session_scope(settings) as db_session:
+        review = db_session.scalars(select(ManagedReview)).one()
+        jobs = db_session.scalars(
+            select(SnapshotBuildJob).order_by(SnapshotBuildJob.scheduled_at.asc())
+        ).all()
+        assert review.status == ManagedReviewStatus.PENDING
+        assert len(jobs) == 1
+        assert jobs[0].status == SnapshotBuildJobStatus.QUEUED
+
+    first_result = run_managed_snapshot_worker(settings=settings, github_client=fake_github)
+    assert first_result.status == "succeeded"
+    assert first_result.snapshot_index == 1
+    assert len(fake_github.check_run_calls) == 2
+    first_ready_call = fake_github.check_run_calls[-1]
+    assert first_ready_call["status"] == "completed"
+    assert first_ready_call["conclusion"] == "neutral"
+    assert "/reviews/octo-org/notebooklens/pulls/7/snapshots/1" in first_ready_call["details_url"]
+    assert "Latest snapshot status: `ready`" in first_ready_call["summary"]
+    assert "Threads: 0 unresolved, 0 resolved, 0 outdated" in first_ready_call["summary"]
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    workspace_v1 = client.get("/api/reviews/octo-org/notebooklens/pulls/7")
+    assert workspace_v1.status_code == 200
+    workspace_v1_json = workspace_v1.json()
+    assert workspace_v1_json["review"]["selected_snapshot_index"] == 1
+    assert workspace_v1_json["review"]["status"] == "ready"
+    metric_row = review_row_for_cell(workspace_v1_json, cell_id="metric-cell")
+    assert metric_row["outputs"]["changed"] is True
+    assert metric_row["summary"] == "cell outputs changed"
+    assert metric_row["source"]["changed"] is False
+
+    create_response = client.post(
+        f"/api/reviews/{workspace_v1_json['review']['id']}/threads",
+        json={
+            "snapshot_id": workspace_v1_json["snapshot"]["id"],
+            "anchor": metric_row["thread_anchors"]["outputs"],
+            "body_markdown": "Explain the regression and update the notebook narrative.",
+        },
+    )
+    assert create_response.status_code == 201
+    created_thread = create_response.json()["thread"]
+    thread_id = created_thread["id"]
+    assert created_thread["status"] == "open"
+    assert len(created_thread["messages"]) == 1
+    assert len(fake_github.check_run_calls) == 3
+    created_call = fake_github.check_run_calls[-1]
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in created_call["summary"]
+    assert (
+        f"Activity: reviewer created a thread on `{REVIEW_WORKSPACE_THREAD_PATH}`."
+        in created_call["summary"]
+    )
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_two_session)
+    reply_response = client.post(
+        f"/api/threads/{thread_id}/messages",
+        json={"body_markdown": "The output still needs narrative context for the regression."},
+    )
+    assert reply_response.status_code == 201
+    replied_thread = reply_response.json()["thread"]
+    assert len(replied_thread["messages"]) == 2
+    assert len(fake_github.check_run_calls) == 4
+    reply_call = fake_github.check_run_calls[-1]
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in reply_call["summary"]
+    assert (
+        f"Activity: reviewer-2 replied to a thread on `{REVIEW_WORKSPACE_THREAD_PATH}`."
+        in reply_call["summary"]
+    )
+
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+    resolve_response = client.post(f"/api/threads/{thread_id}/resolve")
+    assert resolve_response.status_code == 200
+    assert resolve_response.json()["thread"]["status"] == "resolved"
+    assert len(fake_github.check_run_calls) == 5
+    resolve_call = fake_github.check_run_calls[-1]
+    assert "Threads: 0 unresolved, 1 resolved, 0 outdated" in resolve_call["summary"]
+    assert (
+        f"Activity: reviewer resolved the thread on `{REVIEW_WORKSPACE_THREAD_PATH}`."
+        in resolve_call["summary"]
+    )
+
+    snapshot_one_after_resolve = client.get(
+        "/api/reviews/octo-org/notebooklens/pulls/7/snapshots/1"
+    )
+    assert snapshot_one_after_resolve.status_code == 200
+    assert snapshot_one_after_resolve.json()["threads"][0]["status"] == "resolved"
+
+    reopen_response = client.post(f"/api/threads/{thread_id}/reopen")
+    assert reopen_response.status_code == 200
+    assert reopen_response.json()["thread"]["status"] == "open"
+    assert len(fake_github.check_run_calls) == 6
+    reopen_call = fake_github.check_run_calls[-1]
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in reopen_call["summary"]
+    assert (
+        f"Activity: reviewer reopened the thread on `{REVIEW_WORKSPACE_THREAD_PATH}`."
+        in reopen_call["summary"]
+    )
+
+    with session_scope(settings) as db_session:
+        notifications = db_session.scalars(
+            select(NotificationOutbox).order_by(NotificationOutbox.created_at.asc())
+        ).all()
+        assert [
+            (item.event_type.value, item.recipient_github_user_id, item.recipient_email)
+            for item in notifications
+        ] == [
+            ("thread_created", 202, "author@example.test"),
+            ("reply_added", 101, "reviewer@example.test"),
+            ("reply_added", 202, "author@example.test"),
+            ("thread_resolved", 202, "author@example.test"),
+            ("thread_resolved", 303, "reviewer2@example.test"),
+            ("thread_reopened", 202, "author@example.test"),
+            ("thread_reopened", 303, "reviewer2@example.test"),
+        ]
+        assert all(item.delivery_state == NotificationDeliveryState.PENDING for item in notifications)
+
+    second_response = post_pull_request_webhook(
+        client,
+        payload=pull_request_payload(action="synchronize", head_sha="head-sha-2"),
+        delivery_id="delivery-2",
+    )
+    assert second_response.status_code == 202
+    assert second_response.json()["job_id"] is not None
+    assert len(fake_github.check_run_calls) == 7
+    second_pending_call = fake_github.check_run_calls[-1]
+    assert second_pending_call["head_sha"] == "head-sha-2"
+    assert second_pending_call["status"] == "in_progress"
+    assert "Latest snapshot status: `pending`" in second_pending_call["summary"]
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in second_pending_call["summary"]
+
+    with session_scope(settings) as db_session:
+        jobs = db_session.scalars(
+            select(SnapshotBuildJob).order_by(SnapshotBuildJob.scheduled_at.asc())
+        ).all()
+        assert len(jobs) == 2
+        assert jobs[-1].status == SnapshotBuildJobStatus.QUEUED
+
+    second_result = run_managed_snapshot_worker(settings=settings, github_client=fake_github)
+    assert second_result.status == "succeeded"
+    assert second_result.snapshot_index == 2
+    assert len(fake_github.check_run_calls) == 8
+    second_ready_call = fake_github.check_run_calls[-1]
+    assert second_ready_call["status"] == "completed"
+    assert second_ready_call["conclusion"] == "neutral"
+    assert "/reviews/octo-org/notebooklens/pulls/7/snapshots/2" in second_ready_call["details_url"]
+    assert "Latest snapshot status: `ready`" in second_ready_call["summary"]
+    assert "Threads: 1 unresolved, 0 resolved, 0 outdated" in second_ready_call["summary"]
+
+    latest_workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7")
+    assert latest_workspace.status_code == 200
+    latest_workspace_json = latest_workspace.json()
+    assert latest_workspace_json["review"]["selected_snapshot_index"] == 2
+    assert latest_workspace_json["review"]["latest_snapshot_index"] == 2
+    assert latest_workspace_json["review"]["thread_counts"] == {
+        "unresolved": 1,
+        "resolved": 0,
+        "outdated": 0,
+    }
+    assert len(latest_workspace_json["review"]["snapshot_history"]) == 2
+    latest_intro_row = review_row_for_cell(latest_workspace_json, cell_id="intro-cell")
+    latest_metric_row = review_row_for_cell(latest_workspace_json, cell_id="metric-cell")
+    assert "train_v2.csv" in latest_intro_row["source"]["head"]
+    assert latest_metric_row["summary"] == "cell outputs changed"
+    assert latest_metric_row["thread_anchors"]["outputs"] == metric_row["thread_anchors"]["outputs"]
+    assert len(latest_workspace_json["threads"]) == 1
+    latest_thread = latest_workspace_json["threads"][0]
+    assert latest_thread["id"] == thread_id
+    assert latest_thread["status"] == "open"
+    assert latest_thread["carried_forward"] is True
+    assert latest_thread["current_snapshot_id"] == latest_workspace_json["snapshot"]["id"]
+    assert len(latest_thread["messages"]) == 2
+
+    origin_workspace = client.get("/api/reviews/octo-org/notebooklens/pulls/7/snapshots/1")
+    assert origin_workspace.status_code == 200
+    origin_thread = origin_workspace.json()["threads"][0]
+    assert origin_thread["id"] == thread_id
+    assert origin_thread["status"] == "open"
+    assert len(origin_thread["messages"]) == 2
+
+    final_resolve_response = client.post(f"/api/threads/{thread_id}/resolve")
+    assert final_resolve_response.status_code == 200
+    assert final_resolve_response.json()["thread"]["status"] == "resolved"
+    assert len(fake_github.check_run_calls) == 9
+    final_resolve_call = fake_github.check_run_calls[-1]
+    assert "Threads: 0 unresolved, 1 resolved, 0 outdated" in final_resolve_call["summary"]
+    assert (
+        f"Activity: reviewer resolved the thread on `{REVIEW_WORKSPACE_THREAD_PATH}`."
+        in final_resolve_call["summary"]
+    )
+
+    latest_snapshot_after_resolve = client.get("/api/reviews/octo-org/notebooklens/pulls/7")
+    assert latest_snapshot_after_resolve.status_code == 200
+    latest_snapshot_after_resolve_json = latest_snapshot_after_resolve.json()
+    assert latest_snapshot_after_resolve_json["review"]["thread_counts"] == {
+        "unresolved": 0,
+        "resolved": 1,
+        "outdated": 0,
+    }
+    assert latest_snapshot_after_resolve_json["threads"][0]["status"] == "resolved"
+
+    with session_scope(settings) as db_session:
+        thread = db_session.scalars(select(ReviewThread)).one()
+        latest_snapshot = db_session.scalars(
+            select(ReviewSnapshot).where(ReviewSnapshot.snapshot_index == 2)
+        ).one()
+        notifications = db_session.scalars(
+            select(NotificationOutbox).order_by(NotificationOutbox.created_at.asc())
+        ).all()
+        assert thread.status == ReviewThreadStatus.RESOLVED
+        assert thread.carried_forward is True
+        assert thread.current_snapshot_id == latest_snapshot.id
+        assert [
+            (item.event_type.value, item.recipient_github_user_id)
+            for item in notifications
+        ] == [
+            ("thread_created", 202),
+            ("reply_added", 101),
+            ("reply_added", 202),
+            ("thread_resolved", 202),
+            ("thread_resolved", 303),
+            ("thread_reopened", 202),
+            ("thread_reopened", 303),
+            ("thread_resolved", 202),
+            ("thread_resolved", 303),
+        ]
+
     engine.dispose()
 
 
