@@ -381,6 +381,9 @@ See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) f
 - [docs/quickstart-workspace.md](docs/quickstart-workspace.md) for the hosted workspace beta quick start
 - [docs/privacy.md](docs/privacy.md) for data flow, permissions, fork behavior, and hard limits
 - [docs/troubleshooting.md](docs/troubleshooting.md) for common first-run and operator debugging paths
+- [docs/self-hosting.md](docs/self-hosting.md) for the Docker Compose managed-workspace runbook
+- [docs/admin-ai-settings.md](docs/admin-ai-settings.md) for installation-scoped LiteLLM configuration
+- [docs/github-pr-sync.md](docs/github-pr-sync.md) for the GitHub mirror contract and fallback behavior
 - [CHANGELOG.md](CHANGELOG.md) for release notes
 - [SECURITY.md](SECURITY.md) for vulnerability reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release process

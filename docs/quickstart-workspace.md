@@ -54,15 +54,21 @@ This beta does **not** add:
 
 If your team wants to run the hosted workspace itself or configure managed review, use these docs:
 
-- [Self-hosting runbook](self-hosting.md)
-- [LiteLLM admin settings](admin-ai-settings.md)
-- [GitHub PR sync behavior](github-pr-sync.md)
+- [Self-hosting runbook](self-hosting.md) to deploy the stack and finish GitHub App + OAuth wiring
+- [LiteLLM admin settings](admin-ai-settings.md) to add installation-scoped managed AI after the stack is healthy
+- [GitHub PR sync behavior](github-pr-sync.md) to understand how hosted thread activity appears back in GitHub
 
 NotebookLens currently supports one managed deployment path for internal pilots:
 
 - Docker Compose on a single host
 - GitHub.com and GitHub Enterprise Server (`3.20.0+`)
 - one shared public origin through `APP_BASE_URL`
+
+Recommended operator order:
+
+1. Deploy with [self-hosting.md](self-hosting.md)
+2. Configure managed AI with [admin-ai-settings.md](admin-ai-settings.md) if needed
+3. Review GitHub mirror behavior with [github-pr-sync.md](github-pr-sync.md)
 
 ## Privacy and storage
 
