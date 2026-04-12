@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 import uuid
 
 from sqlalchemy import func, select
@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from src.claude_integration import NoneProvider
 from src.diff_engine import DiffLimits, NotebookInput
-from src.review_core import REVIEW_SNAPSHOT_SCHEMA_VERSION, ReviewCoreRequest, build_review_artifacts
+from src.review_core import (
+    REVIEW_SNAPSHOT_SCHEMA_VERSION,
+    ReviewAssetDraft,
+    ReviewCoreRequest,
+    build_review_artifacts,
+)
 
 from .check_runs import (
     build_review_url,
@@ -33,6 +38,7 @@ from .models import (
     InstallationRepository,
     ManagedReview,
     ManagedReviewStatus,
+    ReviewAsset,
     ReviewSnapshot,
     ReviewSnapshotStatus,
     SnapshotBuildJob,
@@ -325,6 +331,15 @@ def run_snapshot_build_worker_once(
             )
         )
         snapshot_payload = review_artifacts.snapshot_payload
+        asset_ids_by_key = _persist_review_assets(
+            db_session=db_session,
+            snapshot=snapshot,
+            review_assets=review_artifacts.review_assets,
+        )
+        snapshot_payload = _rewrite_snapshot_payload_asset_refs(
+            snapshot_payload=snapshot_payload,
+            asset_ids_by_key=asset_ids_by_key,
+        )
         if guidance_notices:
             snapshot_payload = {
                 **snapshot_payload,
@@ -773,6 +788,101 @@ def _load_reviewer_playbooks(config_text: str | None) -> tuple[tuple[ReviewerPla
         return parse_reviewer_playbooks(config_text), []
     except NotebookLensConfigError as exc:
         return (), [f"{_CONFIG_PATH}: invalid config ignored ({exc})"]
+
+
+def _persist_review_assets(
+    *,
+    db_session: Session,
+    snapshot: ReviewSnapshot,
+    review_assets: Sequence[ReviewAssetDraft],
+) -> dict[str, str]:
+    asset_ids_by_key: dict[str, str] = {}
+    assets_by_sha: dict[str, ReviewAsset] = {}
+    for review_asset in review_assets:
+        existing_asset = assets_by_sha.get(review_asset.sha256)
+        if existing_asset is None:
+            existing_asset = ReviewAsset(
+                snapshot_id=snapshot.id,
+                sha256=review_asset.sha256,
+                mime_type=review_asset.mime_type,
+                byte_size=review_asset.byte_size,
+                width=review_asset.width,
+                height=review_asset.height,
+                storage_key=_review_asset_storage_key(snapshot.id, review_asset),
+                content_bytes=review_asset.content_bytes,
+            )
+            db_session.add(existing_asset)
+            db_session.flush()
+            assets_by_sha[review_asset.sha256] = existing_asset
+        asset_ids_by_key[review_asset.asset_key] = str(existing_asset.id)
+    return asset_ids_by_key
+
+
+def _review_asset_storage_key(snapshot_id: uuid.UUID, review_asset: ReviewAssetDraft) -> str:
+    extension = review_asset.mime_type.split("/", 1)[1]
+    return f"review-snapshots/{snapshot_id}/assets/{review_asset.sha256}.{extension}"
+
+
+def _rewrite_snapshot_payload_asset_refs(
+    *,
+    snapshot_payload: Mapping[str, Any],
+    asset_ids_by_key: Mapping[str, str],
+) -> dict[str, Any]:
+    notebooks = snapshot_payload.get("review", {}).get("notebooks", [])
+    rewritten_notebooks: list[dict[str, Any]] = []
+    for notebook in notebooks:
+        render_rows = notebook.get("render_rows")
+        if not isinstance(render_rows, list):
+            rewritten_notebooks.append(dict(notebook))
+            continue
+        rewritten_rows: list[dict[str, Any]] = []
+        for row in render_rows:
+            outputs = row.get("outputs")
+            items = outputs.get("items") if isinstance(outputs, dict) else None
+            if not isinstance(items, list):
+                rewritten_rows.append(dict(row))
+                continue
+            rewritten_items: list[dict[str, Any]] = []
+            for item in items:
+                if item.get("kind") != "image" or "asset_key" not in item:
+                    rewritten_items.append(dict(item))
+                    continue
+                asset_key = str(item["asset_key"])
+                asset_id = asset_ids_by_key.get(asset_key)
+                if asset_id is None:
+                    raise ValueError(f"Missing persisted review asset for key: {asset_key}")
+                rewritten_items.append(
+                    {
+                        "kind": "image",
+                        "asset_id": asset_id,
+                        "mime_type": item.get("mime_type"),
+                        "width": item.get("width"),
+                        "height": item.get("height"),
+                        "change_type": item.get("change_type"),
+                    }
+                )
+            rewritten_rows.append(
+                {
+                    **row,
+                    "outputs": {
+                        **outputs,
+                        "items": rewritten_items,
+                    },
+                }
+            )
+        rewritten_notebooks.append(
+            {
+                **notebook,
+                "render_rows": rewritten_rows,
+            }
+        )
+    return {
+        **snapshot_payload,
+        "review": {
+            **snapshot_payload["review"],
+            "notebooks": rewritten_notebooks,
+        },
+    }
 
 
 def _job_matches_latest_review(*, review: ManagedReview, job: SnapshotBuildJob) -> bool:

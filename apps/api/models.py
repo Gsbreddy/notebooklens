@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Text,
@@ -260,6 +261,10 @@ class ReviewSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     managed_review: Mapped[ManagedReview] = relationship(back_populates="review_snapshots")
+    review_assets: Mapped[list["ReviewAsset"]] = relationship(
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+    )
     origin_threads: Mapped[list["ReviewThread"]] = relationship(
         back_populates="origin_snapshot",
         foreign_keys="ReviewThread.origin_snapshot_id",
@@ -380,6 +385,30 @@ class NotificationOutbox(Base):
     thread: Mapped[ReviewThread] = relationship(back_populates="notifications")
 
 
+class ReviewAsset(Base):
+    __tablename__ = "review_assets"
+    __table_args__ = (
+        UniqueConstraint("snapshot_id", "sha256"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("review_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    content_bytes: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    snapshot: Mapped[ReviewSnapshot] = relationship(back_populates="review_assets")
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
@@ -402,6 +431,7 @@ __all__ = [
     "NotificationDeliveryState",
     "NotificationEventType",
     "NotificationOutbox",
+    "ReviewAsset",
     "ReviewThread",
     "ReviewThreadStatus",
     "ReviewSnapshot",

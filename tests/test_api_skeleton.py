@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -35,6 +36,7 @@ from apps.api.models import (
     NotificationDeliveryState,
     NotificationEventType,
     NotificationOutbox,
+    ReviewAsset,
     ReviewThread,
     ReviewThreadStatus,
     ReviewSnapshot,
@@ -74,6 +76,9 @@ def _generate_private_key() -> str:
 TEST_PRIVATE_KEY = _generate_private_key()
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REVIEW_WORKSPACE_THREAD_PATH = "notebooks/training/churn_model.ipynb"
+SMALL_PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2N1foAAAAASUVORK5CYII="
+)
 
 
 class FakeOAuthClient:
@@ -378,6 +383,127 @@ def review_thread_notebook(metric: str, *, explanation: str = "Baseline churn tr
     )
 
 
+def review_asset_notebook(
+    *,
+    png_payload: str = SMALL_PNG_BASE64,
+    include_placeholders: bool = True,
+) -> tuple[str, str]:
+    base_cells = [
+        {
+            "cell_type": "code",
+            "id": "plot-one",
+            "source": "plot_one()",
+            "metadata": {},
+            "outputs": [],
+        },
+        {
+            "cell_type": "code",
+            "id": "plot-two",
+            "source": "plot_two()",
+            "metadata": {},
+            "outputs": [],
+        },
+    ]
+    head_cells = [
+        {
+            "cell_type": "code",
+            "id": "plot-one",
+            "source": "plot_one()",
+            "metadata": {},
+            "outputs": [
+                {
+                    "output_type": "display_data",
+                    "data": {"image/png": png_payload},
+                }
+            ],
+        },
+        {
+            "cell_type": "code",
+            "id": "plot-two",
+            "source": "plot_two()",
+            "metadata": {},
+            "outputs": [
+                {
+                    "output_type": "display_data",
+                    "data": {"image/png": png_payload},
+                }
+            ],
+        },
+    ]
+    if include_placeholders:
+        oversized_gif_base64 = base64.b64encode(
+            b"GIF89a\x01\x00\x01\x00" + (b"\x00" * 2_097_200)
+        ).decode("ascii")
+        base_cells.extend(
+            [
+                {
+                    "cell_type": "code",
+                    "id": "svg-plot",
+                    "source": "plot_svg()",
+                    "metadata": {},
+                    "outputs": [],
+                },
+                {
+                    "cell_type": "code",
+                    "id": "too-large-plot",
+                    "source": "plot_large()",
+                    "metadata": {},
+                    "outputs": [],
+                },
+            ]
+        )
+        head_cells.extend(
+            [
+                {
+                    "cell_type": "code",
+                    "id": "svg-plot",
+                    "source": "plot_svg()",
+                    "metadata": {},
+                    "outputs": [
+                        {
+                            "output_type": "display_data",
+                            "data": {
+                                "image/svg+xml": (
+                                    "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>"
+                                )
+                            },
+                        }
+                    ],
+                },
+                {
+                    "cell_type": "code",
+                    "id": "too-large-plot",
+                    "source": "plot_large()",
+                    "metadata": {},
+                    "outputs": [
+                        {
+                            "output_type": "display_data",
+                            "data": {"image/gif": oversized_gif_base64},
+                        }
+                    ],
+                },
+            ]
+        )
+    return (
+        json.dumps(
+            {
+                "cells": base_cells,
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
+        json.dumps(
+            {
+                "cells": head_cells,
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
+    )
+
+
 def test_api_settings_load_and_normalize_private_key(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     assert settings.snapshot_retention_days == 90
@@ -526,6 +652,7 @@ def test_managed_api_metadata_and_migration_scaffold_exist() -> None:
         "installation_repositories",
         "managed_reviews",
         "notification_outbox",
+        "review_assets",
         "snapshot_build_jobs",
         "review_threads",
         "review_snapshots",
@@ -539,6 +666,9 @@ def test_managed_api_metadata_and_migration_scaffold_exist() -> None:
     assert migration_path.exists()
     assert Path(
         "apps/api/alembic/versions/20260412_0002_add_review_threads_and_notifications.py"
+    ).exists()
+    assert Path(
+        "apps/api/alembic/versions/20260412_0003_add_review_assets.py"
     ).exists()
 
 
@@ -1099,6 +1229,96 @@ def test_snapshot_worker_builds_ready_snapshot_and_updates_check_run(tmp_path: P
     assert ready_call["conclusion"] == "neutral"
     assert "/reviews/octo-org/notebooklens/pulls/7/snapshots/1" in ready_call["details_url"]
     assert "Latest snapshot status: `ready`" in ready_call["summary"]
+    engine.dispose()
+
+
+def test_snapshot_worker_persists_deduplicated_review_assets_and_rewrites_payload(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    base_notebook, head_notebook = review_asset_notebook()
+    app = create_app()
+    fake_github = FakeManagedGitHubClient(
+        files=[
+            {
+                "filename": "analysis/plots.ipynb",
+                "status": "modified",
+                "size": 4096,
+            }
+        ],
+        contents={
+            ("analysis/plots.ipynb", "base-sha"): base_notebook,
+            ("analysis/plots.ipynb", "head-sha"): head_notebook,
+        },
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_managed_github_client] = lambda: fake_github
+    client = TestClient(app)
+
+    payload = pull_request_payload()
+    body = json.dumps(payload).encode("utf-8")
+    response = client.post(
+        "/api/github/webhooks",
+        content=body,
+        headers={
+            "X-GitHub-Event": "pull_request",
+            "X-GitHub-Delivery": "delivery-assets",
+            "X-Hub-Signature-256": sign_github_webhook("webhook-secret", body),
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 202
+
+    with session_scope(settings) as db_session:
+        result = run_snapshot_build_worker_once(
+            settings=settings,
+            db_session=db_session,
+            github_client=fake_github,
+        )
+        assert result.status == "succeeded"
+
+    with session_scope(settings) as db_session:
+        snapshot = db_session.scalars(select(ReviewSnapshot)).one()
+        stored_assets = db_session.scalars(select(ReviewAsset)).all()
+        assert len(stored_assets) == 1
+        stored_asset = stored_assets[0]
+        assert stored_asset.snapshot_id == snapshot.id
+        assert stored_asset.mime_type == "image/png"
+        assert stored_asset.byte_size > 0
+        assert stored_asset.width == 1
+        assert stored_asset.height == 1
+        assert stored_asset.storage_key.endswith(f"{stored_asset.sha256}.png")
+
+        notebook = snapshot.snapshot_payload_json["review"]["notebooks"][0]
+        rows = {
+            row["locator"]["cell_id"]: row
+            for row in notebook["render_rows"]
+        }
+        plot_one_item = rows["plot-one"]["outputs"]["items"][0]
+        plot_two_item = rows["plot-two"]["outputs"]["items"][0]
+        assert plot_one_item == {
+            "kind": "image",
+            "asset_id": str(stored_asset.id),
+            "mime_type": "image/png",
+            "width": 1,
+            "height": 1,
+            "change_type": "added",
+        }
+        assert plot_two_item["asset_id"] == str(stored_asset.id)
+        assert "asset_key" not in plot_one_item
+
+        svg_item = rows["svg-plot"]["outputs"]["items"][0]
+        assert svg_item["kind"] == "placeholder"
+        assert "unsupported image format" in svg_item["summary"]
+
+        oversized_item = rows["too-large-plot"]["outputs"]["items"][0]
+        assert oversized_item["kind"] == "placeholder"
+        assert "exceeds 2097152 bytes" in oversized_item["summary"]
+
+        serialized_payload = json.dumps(snapshot.snapshot_payload_json)
+        assert SMALL_PNG_BASE64 not in serialized_payload
+        assert "iVBOR" not in serialized_payload
+
     engine.dispose()
 
 
