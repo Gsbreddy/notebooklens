@@ -1,9 +1,16 @@
 # NotebookLens
 [![pytest](https://github.com/Gsbreddy/notebooklens/actions/workflows/ci.yml/badge.svg)](https://github.com/Gsbreddy/notebooklens/actions/workflows/ci.yml)
 
-GitHub Action for Jupyter notebook PR review. Detects `.ipynb` changes, diffs cells, and posts one auto-updating PR comment with notebook-local reviewer guidance and optional Claude AI summaries. No checkout required. `none` mode needs no external AI key.
+Notebook-aware pull request review for Jupyter notebooks on GitHub. NotebookLens ships as two separate products that can coexist on the same PR: an OSS GitHub Action that posts one auto-updating PR comment with notebook-local reviewer guidance and optional Claude AI summaries, and an optional hosted review workspace beta that opens from a dedicated check run for notebook-aware diffs and inline threads.
 
-## Quick Start
+| Product | Enable it by | GitHub surface | What it does |
+|---|---|---|---|
+| OSS Action | Add `Gsbreddy/notebooklens@v0` to a workflow | Sticky PR comment keyed by `<!-- notebooklens-comment -->` | Summarizes notebook changes, flagged findings, and optional Claude output |
+| Hosted Review Workspace Beta | Install the NotebookLens GitHub App and sign in with GitHub OAuth | Dedicated `NotebookLens Review Workspace` check run | Opens a hosted PR review workspace with snapshot history and inline thread workflows |
+
+The Action and the GitHub App have separate onboarding and separate GitHub surfaces. If both are enabled on the same PR, the Action keeps owning the sticky comment and the App keeps owning the dedicated check run. `.github/notebooklens.yml` remains shared review config for both.
+
+## OSS Action Quick Start
 
 Use this first. It needs no AI key, sends nothing to external model providers, and still includes built-in reviewer guidance for changed notebooks.
 
@@ -37,6 +44,24 @@ jobs:
 
 `GITHUB_TOKEN` is the built-in Actions token used to read PR file metadata and create or update the review comment. No extra setup is required — GitHub provides it automatically in every workflow run.
 
+## Hosted Review Workspace Beta
+
+The hosted parity beta is a separate GitHub App + web app flow. It does not replace the OSS Action, and it does not add new public Action `with:` inputs.
+
+Managed beta deployments use `APP_BASE_URL` as the shared public base URL for the hosted review UI and its `/api/...` routes.
+
+1. Install the NotebookLens GitHub App on the repositories you want to review.
+2. Sign in to NotebookLens with GitHub OAuth.
+3. Open or update a pull request with `.ipynb` changes.
+4. Open the `NotebookLens Review Workspace` check run to launch the hosted review URL for the latest snapshot.
+5. Create, reply to, resolve, or reopen inline threads inside the hosted workspace.
+
+The beta is PR-only. This release does not support commit-only review, standalone notebook conversations, or native GitHub review comment sync.
+
+The managed beta uses deterministic local review only. There are no managed Claude/OpenAI provider settings in this release.
+
+To keep the hosted UI fast and stable across pushes, NotebookLens stores versioned normalized review snapshots per PR revision for 90 days by default. Those snapshots include changed-cell source text, limited neighboring context, output and metadata summaries, deterministic findings, reviewer guidance, and stable thread anchors. NotebookLens does not store untouched full notebook revisions wholesale for the hosted beta.
+
 ## Enable Claude (optional)
 
 After `none` mode is useful for your PR triage flow, enable Claude for richer summaries and findings.
@@ -58,6 +83,8 @@ If `ai-provider=claude` is requested without a key, or Claude fails, the run deg
 **Fork PRs:** When a PR originates from a fork, GitHub Actions does not expose repository secrets to the workflow. If `ai-provider: claude` is configured but the fork provides no `ai-api-key`, NotebookLens automatically falls back to `none` mode and adds a visible notice in the PR comment. No manual handling is needed.
 
 ## PR Comment Format
+
+This section applies to the OSS Action comment surface.
 
 NotebookLens posts one comment per PR identified by the HTML marker `<!-- notebooklens-comment -->`. The comment is updated in place on each push. It is deleted if the PR no longer contains `.ipynb` changes.
 
@@ -102,7 +129,7 @@ Model training cell updated with new learning rate parameter. Output confirms lo
 
 The `<details>` block with the AI summary appears only when `ai-provider: claude` succeeds. `##### Reviewer Guidance` appears only for notebooks that have at least one guidance item. Notebook-local notices are rendered inline under the affected notebook. The `### Notices` section appears only when there are global limit-related or processing notices, including invalid `.github/notebooklens.yml` warnings.
 
-## How It Works
+## OSS Action Flow
 
 NotebookLens runs as a Docker GitHub Action triggered only on `pull_request` events with actions `opened`, `synchronize`, or `reopened`. It never checks out your repository — all file content is fetched directly from the GitHub Contents API.
 
@@ -122,6 +149,16 @@ NotebookLens runs as a Docker GitHub Action triggered only on `pull_request` eve
 
 7. **Comment sync** — Creates, updates, or deletes exactly one bot-authored PR comment identified by the HTML marker `<!-- notebooklens-comment -->`. If notebook changes disappear from a later commit, the comment is deleted automatically.
 
+## Hosted Review Workspace Beta Flow
+
+1. The GitHub App receives `pull_request` webhooks for `opened`, `synchronize`, and `reopened` events on installed repositories.
+2. The managed backend fetches notebook content with a GitHub App installation token and builds a versioned normalized review snapshot with the shared Python review core.
+3. NotebookLens creates or updates the `NotebookLens Review Workspace` check run in `pending`, `neutral`, or `action_required` state with an `Open in NotebookLens` link, snapshot status, and unresolved/resolved/outdated thread counts.
+4. Signed-in reviewers open the hosted route from the check run after GitHub OAuth access checks pass for the repository.
+5. The hosted UI renders the latest snapshot, allows snapshot-history switching, and supports inline thread create/reply/resolve/reopen actions on changed notebook blocks.
+6. Unresolved threads are carried forward on a best-effort basis when anchors still match safely; otherwise they remain on older snapshots and are marked `outdated`.
+7. Email notifications are sent only to signed-in participants and the PR author when a usable email is available.
+
 ## Inputs
 
 | Input | Type | Default | Description |
@@ -132,6 +169,8 @@ NotebookLens runs as a Docker GitHub Action triggered only on `pull_request` eve
 | `redact-emails` | bool | `true` | Redact email addresses before any external call. |
 
 `GITHUB_TOKEN` is passed via `env:`, not `with:`. It must have `contents: read` and `pull-requests: write` permissions. These are explicitly declared in the workflow `permissions:` block (see Quick Start).
+
+The hosted review workspace beta is enabled through GitHub App installation plus GitHub OAuth sign-in. It does not add new public Action inputs.
 
 ## Outputs
 
@@ -151,7 +190,7 @@ Give the action step an `id` such as `id: notebooklens` if you want to read outp
     echo "Changed notebooks: ${{ steps.notebooklens.outputs.changed-notebooks }}"
 ```
 
-**Out of scope for v0.2.0:** OpenAI/Ollama providers, GitLab/Bitbucket, hosted review UI, inline notebook threads.
+**Out of scope for `v0.3.0-beta`:** commit-only review, standalone notebook conversations outside pull requests, native GitHub review comment synchronization, self-hosting, billing/RBAC/SSO, extra public Action inputs, and managed Claude/OpenAI provider settings.
 
 ## Reviewer Guidance Playbooks
 
@@ -205,10 +244,13 @@ In `none` mode, NotebookLens applies four deterministic checks across notebook-l
 
 Claude mode includes all of the above plus AI-generated findings and optional AI-added reviewer guidance.
 
-## Privacy Note
+## Privacy & Storage Note
 
 - In `none` mode, NotebookLens performs local diff/review logic only and does not call external AI APIs.
 - In `claude` mode, NotebookLens sends redaction-processed review payload data to Anthropic.
+- In the hosted parity beta, NotebookLens stores versioned normalized PR review snapshots for 90 days by default so the workspace can load quickly and keep thread state across pushes. It does not store untouched full notebook revisions wholesale.
+- The hosted parity beta uses deterministic local review only. It does not add managed Claude/OpenAI provider configuration in this release.
+- Hosted review access is gated by encrypted GitHub OAuth sessions plus repo-access checks, and thread email notifications are limited to signed-in participants plus the PR author when a usable email is known.
 - Redaction is best effort. It targets:
   - URI credentials (`scheme://user:pass@host`)
   - Connection strings (PostgreSQL, MySQL, MongoDB, Redis, AMQP, Snowflake, JDBC)

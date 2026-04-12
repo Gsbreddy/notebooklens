@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0-beta] - 2026-04-12
+
+### Added
+
+- Hosted PR-linked review workspace beta with notebook-aware diff rendering, snapshot history, and inline thread create/reply/resolve/reopen flows.
+- GitHub App onboarding plus GitHub OAuth sign-in for the managed review workspace.
+- Dedicated `NotebookLens Review Workspace` check run with snapshot status, hosted-review entrypoint, and thread-count summaries.
+- Versioned normalized snapshot storage for PR revisions, including thread carry-forward and `outdated` thread handling when anchors stop matching safely.
+- Hosted beta email notifications for thread-created, reply-added, resolved, and reopened events.
+
+### Changed
+
+- Public docs now separate OSS Action onboarding from GitHub App onboarding and clarify that both products can coexist on the same pull request.
+- Managed beta scope is now explicitly PR-only and deterministic-local-review-only, with no new public Action `with:` inputs.
+
 ## [0.2.0] - 2026-04-12
 
 ### Added

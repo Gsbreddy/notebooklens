@@ -1,4 +1,4 @@
-"""Notebook diff engine for NotebookLens v0.2.0."""
+"""Notebook diff engine for NotebookLens."""
 
 from __future__ import annotations
 
@@ -67,9 +67,12 @@ class CellChange:
     cell_type: CellType
     change_type: CellChangeType
     summary: str
+    base_source: Optional[str]
+    head_source: Optional[str]
     source_changed: bool
     outputs_changed: bool
     material_metadata_changed: bool
+    metadata_summary: Optional[str]
     output_changes: List[OutputChange]
     review_context: List[ContextCell]
 
@@ -165,6 +168,8 @@ class _PairDiff:
     base_index: Optional[int]
     head_index: Optional[int]
     cell_type: CellType
+    base_source: Optional[str]
+    head_source: Optional[str]
     source_changed: bool
     outputs_changed: bool
     material_metadata_changed: bool
@@ -316,9 +321,12 @@ def _diff_single_notebook(
                 cell_type=pair.cell_type,
                 change_type=change_type,
                 summary=summary,
+                base_source=pair.base_source,
+                head_source=pair.head_source,
                 source_changed=pair.source_changed,
                 outputs_changed=pair.outputs_changed,
                 material_metadata_changed=pair.material_metadata_changed,
+                metadata_summary=_metadata_summary(pair.material_metadata_changed),
                 output_changes=pair.output_changes,
                 review_context=review_context,
             )
@@ -416,7 +424,7 @@ def _normalize_output(output: Dict[str, Any]) -> Dict[str, Any]:
     normalized: Dict[str, Any] = {}
     for key, value in output.items():
         if key in {"execution_count", "metadata"}:
-            # Ignore volatile output metadata churn for v0.2.0 significance.
+            # Ignore volatile output metadata churn for review significance.
             continue
         normalized[str(key)] = _stable_jsonable(value)
     return normalized
@@ -644,6 +652,8 @@ def _build_pair_diffs(
                 base_index=row.base_index,
                 head_index=row.head_index,
                 cell_type=cell_type,
+                base_source=base_cell.source if base_cell is not None else None,
+                head_source=head_cell.source if head_cell is not None else None,
                 source_changed=source_changed,
                 outputs_changed=outputs_changed,
                 material_metadata_changed=material_metadata_changed,
@@ -940,6 +950,12 @@ def _summarize_notebook_metadata_change(
     if base_nb.material_metadata == head_nb.material_metadata:
         return None
     return "notebook material metadata changed (kernelspec/language_info)"
+
+
+def _metadata_summary(material_metadata_changed: bool) -> Optional[str]:
+    if not material_metadata_changed:
+        return None
+    return "material metadata changed"
 
 
 def notebook_diff_to_dict(notebook_diff: NotebookDiff) -> Dict[str, Any]:
