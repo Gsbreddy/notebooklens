@@ -1,2 +1,1 @@
 """NotebookLens application packages."""
-
