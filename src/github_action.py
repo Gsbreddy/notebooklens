@@ -26,6 +26,7 @@ from .claude_integration import (
 )
 from .diff_engine import DiffLimits, NotebookDiff, NotebookInput, ReviewResult, build_notebook_diff
 from .github_api import CommentSyncResult, GitHubApiClient, claude_succeeded_from_metadata, sync_review_comment
+from .review_core import ReviewCoreRequest, build_review_artifacts
 
 
 SUPPORTED_EVENT_NAME = "pull_request"
@@ -294,7 +295,15 @@ def run_action(
         provider_factory=provider_factory,
     )
 
-    review_result = provider.review(notebook_diff)
+    review_artifacts = build_review_artifacts(
+        ReviewCoreRequest(
+            notebook_inputs=notebook_inputs,
+            reviewer=provider,
+            limits=limits,
+        )
+    )
+    notebook_diff = review_artifacts.notebook_diff
+    review_result = review_artifacts.review_result
     provider_meta = provider.last_run_metadata
     runtime_effective_provider = "none" if provider_meta.used_fallback else selected_provider
 
