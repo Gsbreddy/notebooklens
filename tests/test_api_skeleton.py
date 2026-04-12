@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 import jwt
 from sqlalchemy import select
 
-from apps.api.config import ApiSettings, get_settings, reset_settings_cache
+from apps.api.config import ApiConfigurationError, ApiSettings, get_settings, reset_settings_cache
 from apps.api.check_runs import sync_review_workspace_check_run
 from apps.api.database import create_all_tables, get_engine, reset_engine_cache, session_scope
 from apps.api.github_app import GitHubAppClient, build_github_app_jwt, build_github_app_headers
@@ -59,6 +59,7 @@ from apps.api.orchestration import run_snapshot_build_worker_once
 from apps.api.review_workspace import get_workspace_payload
 from apps.api.routes.auth import get_oauth_client
 from apps.api.routes.github import get_managed_github_client
+from apps.api.routes.repo_access import reset_repo_access_cache
 from apps.api.worker import process_notification_delivery_once, process_retention_cleanup_once
 from apps.api.webhooks import GitHubWebhookVerificationError, sign_github_webhook, verify_github_webhook_signature
 
@@ -240,6 +241,7 @@ def _settings(tmp_path: Path) -> ApiSettings:
     database_url = f"sqlite+pysqlite:///{tmp_path / 'managed-api.sqlite3'}"
     reset_settings_cache()
     reset_engine_cache()
+    reset_repo_access_cache()
     return ApiSettings.from_env(_env(database_url))
 
 
@@ -504,12 +506,93 @@ def review_asset_notebook(
     )
 
 
+def create_review_asset_fixture(settings: ApiSettings) -> str:
+    asset_bytes = base64.b64decode(SMALL_PNG_BASE64)
+    with session_scope(settings) as db_session:
+        installation = GitHubInstallation(
+            github_installation_id=11,
+            account_login="octo-org",
+            account_type=InstallationAccountType.ORGANIZATION,
+        )
+        db_session.add(installation)
+        db_session.flush()
+
+        repository = InstallationRepository(
+            installation_id=installation.id,
+            owner="octo-org",
+            name="notebooklens",
+            full_name="octo-org/notebooklens",
+            private=True,
+            active=True,
+        )
+        db_session.add(repository)
+        db_session.flush()
+
+        review = ManagedReview(
+            installation_repository_id=repository.id,
+            owner="octo-org",
+            repo="notebooklens",
+            pull_number=7,
+            base_branch="main",
+            latest_base_sha="base-sha",
+            latest_head_sha="head-sha",
+            status=ManagedReviewStatus.READY,
+        )
+        db_session.add(review)
+        db_session.flush()
+
+        snapshot = ReviewSnapshot(
+            managed_review_id=review.id,
+            base_sha="base-sha",
+            head_sha="head-sha",
+            snapshot_index=1,
+            status=ReviewSnapshotStatus.READY,
+            schema_version=1,
+            summary_text=None,
+            flagged_findings_json=[],
+            reviewer_guidance_json=[],
+            snapshot_payload_json={"schema_version": 1, "review": {"notebooks": []}},
+            notebook_count=1,
+            changed_cell_count=1,
+            failure_reason=None,
+        )
+        db_session.add(snapshot)
+        db_session.flush()
+
+        review.latest_snapshot_id = snapshot.id
+        asset = ReviewAsset(
+            snapshot_id=snapshot.id,
+            sha256="6036f1a33af7cb1f50fb76fa2e7be2d0dce995c8484af18f4f5bc085ac6f6f6a",
+            mime_type="image/png",
+            byte_size=len(asset_bytes),
+            width=1,
+            height=1,
+            storage_key=f"reviews/{snapshot.id}/6036f1a33af7cb1f50fb76fa2e7be2d0dce995c8484af18f4f5bc085ac6f6f6a.png",
+            content_bytes=asset_bytes,
+        )
+        db_session.add(asset)
+        db_session.flush()
+        return str(asset.id)
+
+
 def test_api_settings_load_and_normalize_private_key(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
     assert settings.snapshot_retention_days == 90
     assert settings.managed_review_beta_enabled is True
+    assert settings.app_base_url == "https://notebooklens.test"
     assert "BEGIN RSA PRIVATE KEY" in settings.github_app_private_key
     assert "\\n" not in settings.github_app_private_key
+
+
+def test_api_settings_reject_non_origin_app_base_url(tmp_path: Path) -> None:
+    invalid_env = _env(f"sqlite+pysqlite:///{tmp_path / 'managed-api.sqlite3'}")
+    invalid_env["APP_BASE_URL"] = "https://notebooklens.test/reviews"
+    try:
+        ApiSettings.from_env(invalid_env)
+    except ApiConfigurationError as exc:
+        assert str(exc) == "APP_BASE_URL must be an origin without a path, query, or fragment"
+    else:
+        raise AssertionError("Expected APP_BASE_URL validation to fail")
 
 
 def test_build_github_app_jwt_and_headers() -> None:
@@ -554,6 +637,30 @@ def test_webhook_signature_helpers() -> None:
         pass
     else:
         raise AssertionError("Expected webhook verification to fail")
+
+
+def test_healthz_reports_configuration_errors(tmp_path: Path, monkeypatch: Any) -> None:
+    env = _env(f"sqlite+pysqlite:///{tmp_path / 'managed-api.sqlite3'}")
+    env["APP_BASE_URL"] = "https://notebooklens.test/reviews"
+    reset_settings_cache()
+    reset_engine_cache()
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    client = TestClient(create_app())
+    response = client.get("/healthz")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "error",
+        "checks": {
+            "config": {
+                "status": "error",
+                "detail": "APP_BASE_URL must be an origin without a path, query, or fragment",
+            },
+            "database": {"status": "unknown"},
+        },
+    }
 
 
 def test_oauth_state_and_session_cipher_round_trip() -> None:
@@ -1318,6 +1425,67 @@ def test_snapshot_worker_persists_deduplicated_review_assets_and_rewrites_payloa
         serialized_payload = json.dumps(snapshot.snapshot_payload_json)
         assert SMALL_PNG_BASE64 not in serialized_payload
         assert "iVBOR" not in serialized_payload
+
+    engine.dispose()
+
+
+def test_review_assets_route_serves_private_image_bytes_for_authorized_users(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    asset_id = create_review_asset_fixture(settings)
+    app = create_app()
+    fake_oauth = FakeOAuthClient()
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="gho_reviewer",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+
+    response = client.get(f"/api/review-assets/{asset_id}")
+
+    assert response.status_code == 200
+    assert response.content == base64.b64decode(SMALL_PNG_BASE64)
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "private"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert fake_oauth.repo_access_checks == [("gho_reviewer", "octo-org", "notebooklens")]
+
+    engine.dispose()
+
+
+def test_review_assets_route_rejects_users_without_repo_access(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    engine = get_engine(settings.database_url)
+    create_all_tables(engine)
+    asset_id = create_review_asset_fixture(settings)
+    app = create_app()
+    fake_oauth = FakeOAuthClient(
+        repo_access={("gho_denied", "octo-org", "notebooklens"): False}
+    )
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_oauth_client] = lambda: fake_oauth
+    client = TestClient(app)
+
+    reviewer_session = create_user_session(
+        settings,
+        github_user_id=101,
+        github_login="reviewer",
+        access_token="gho_denied",
+    )
+    client.cookies.set(SESSION_COOKIE_NAME, reviewer_session)
+
+    response = client.get(f"/api/review-assets/{asset_id}")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Repository access denied"}
+    assert fake_oauth.repo_access_checks == [("gho_denied", "octo-org", "notebooklens")]
 
     engine.dispose()
 
