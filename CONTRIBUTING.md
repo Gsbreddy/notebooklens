@@ -54,11 +54,13 @@ git diff --check
 
 1. Merge the release-ready branch into `main`.
 2. Open the Actions tab and run the `Release` workflow on `main`.
-3. Provide a version input in `0.x.y` form, for example `0.2.0`.
+3. Provide a version input in `0.x.y` form, for example `0.4.0`.
 4. Verify:
    - tag `v0.x.y` exists
    - floating tag `v0` points to the same commit
    - GitHub Release notes match `CHANGELOG.md`
+
+The current release workflow accepts only `0.x.y` version inputs. Changelog or docs references to an upcoming beta line such as `v0.4.1-beta` are planning markers until a matching prerelease tagging flow is added.
 
 ## Community Standards
 
