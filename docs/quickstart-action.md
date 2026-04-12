@@ -93,12 +93,12 @@ Key defaults for the Action path:
 - `claude` mode sends redacted review payloads to Anthropic
 - NotebookLens never checks out the repository during the Action run
 - Hard limits and deterministic behavior are documented in:
+  - [privacy.md](privacy.md)
   - [README.md#hard-limits](../README.md#hard-limits)
-  - [README.md#privacy--storage-note](../README.md#privacy--storage-note)
 
 ## Troubleshooting
 
-For common setup issues, start with [README.md#troubleshooting](../README.md#troubleshooting).
+For common setup issues, start with [troubleshooting.md](troubleshooting.md).
 
 The most common first-run misses are:
 

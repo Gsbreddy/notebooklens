@@ -281,6 +281,8 @@ Claude mode includes all of the above plus AI-generated findings and optional AI
 
 ## Privacy & Storage Note
 
+Prefer one central page for Action vs hosted-workspace data flow, permissions, fork behavior, and limits? Use [docs/privacy.md](docs/privacy.md).
+
 - In `none` mode, NotebookLens performs local diff/review logic only and does not call external AI APIs.
 - In `claude` mode, NotebookLens sends redaction-processed review payload data to Anthropic.
 - In the hosted parity beta, NotebookLens stores versioned normalized PR review snapshots for 90 days by default so the workspace can load quickly and keep thread state across pushes. It does not store untouched full notebook revisions wholesale.
@@ -334,6 +336,8 @@ Unsupported events do not emit `notebooklens.comment_sync` because comment sync 
 
 ## Troubleshooting
 
+Prefer one central troubleshooting path for the Action and the hosted workspace beta? Use [docs/troubleshooting.md](docs/troubleshooting.md).
+
 `No comment appears on a PR`
 - Confirm event is `pull_request` with one of: `opened`, `synchronize`, `reopened`.
 - Confirm at least one changed file ends in `.ipynb`.
@@ -375,6 +379,8 @@ See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) f
 
 - [docs/quickstart-action.md](docs/quickstart-action.md) for the shortest OSS Action install path
 - [docs/quickstart-workspace.md](docs/quickstart-workspace.md) for the hosted workspace beta quick start
+- [docs/privacy.md](docs/privacy.md) for data flow, permissions, fork behavior, and hard limits
+- [docs/troubleshooting.md](docs/troubleshooting.md) for common first-run and operator debugging paths
 - [CHANGELOG.md](CHANGELOG.md) for release notes
 - [SECURITY.md](SECURITY.md) for vulnerability reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release process

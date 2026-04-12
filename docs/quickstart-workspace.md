@@ -79,11 +79,11 @@ Those snapshots include review-ready notebook diff material such as:
 
 NotebookLens does not store untouched full notebook revisions wholesale for the hosted beta.
 
-For broader privacy details across the Action and hosted workspace surfaces, see [README.md#privacy--storage-note](../README.md#privacy--storage-note).
+For broader privacy details across the Action and hosted workspace surfaces, see [privacy.md](privacy.md).
 
 ## Troubleshooting
 
-Start with [README.md#troubleshooting](../README.md#troubleshooting) if:
+Start with [troubleshooting.md](troubleshooting.md) if:
 
 - the check run does not appear
 - the hosted link fails to open
