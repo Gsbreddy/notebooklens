@@ -56,8 +56,8 @@ jobs:
 
 `GITHUB_TOKEN` is the built-in GitHub Actions token. NotebookLens uses it to read changed notebook metadata and create or update the sticky review comment.
 
-You can also start from the checked-in workflow example in the repo:
-[`/.github/notebooklens-pr.example.yml`](https://github.com/Gsbreddy/notebooklens/blob/main/.github/notebooklens-pr.example.yml).
+If you prefer to copy from a checked-in example instead of the snippet above, use the workflow file in the repository root:
+`/.github/notebooklens-pr.example.yml`.
 
 ## 2. Open or update a pull request
 
@@ -84,12 +84,35 @@ If notebook changes disappear from later pushes, NotebookLens deletes its own ma
 
 After the baseline `none` mode flow is useful, you can add optional capabilities:
 
-- Enable Claude with the repo README section:
-  [Enable Claude (optional)](https://github.com/Gsbreddy/notebooklens/blob/main/README.md#enable-claude-optional)
-- Add repo-specific reviewer prompts with the README playbooks section:
-  [Reviewer Guidance Playbooks](https://github.com/Gsbreddy/notebooklens/blob/main/README.md#reviewer-guidance-playbooks)
-- Inspect the exact comment format in the README:
-  [PR Comment Format](https://github.com/Gsbreddy/notebooklens/blob/main/README.md#pr-comment-format)
+- Enable Claude by changing the workflow to:
+
+```yaml
+- name: Run NotebookLens (Claude mode)
+  uses: Gsbreddy/notebooklens@v0
+  env:
+    GITHUB_TOKEN: ${{ github.token }}
+  with:
+    ai-provider: claude
+    ai-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+    redact-secrets: true
+    redact-emails: true
+```
+
+- Add repo-specific reviewer prompts with `.github/notebooklens.yml`:
+
+```yaml
+version: 1
+reviewer_guidance:
+  playbooks:
+    - name: Training notebooks
+      paths:
+        - "notebooks/training/**/*.ipynb"
+      prompts:
+        - "Verify the dataset split and random seed changes are intentional."
+        - "Check whether metric changes are explained in markdown or the PR description."
+```
+
+- Inspect a realistic comment shape on [examples.md](examples.md).
 
 ## Privacy and limits
 
@@ -99,6 +122,17 @@ Key defaults for the Action path:
 - `claude` mode sends redacted review payloads to Anthropic
 - NotebookLens never checks out the repository during the Action run
 - Hard limits and deterministic behavior are documented in [privacy.md](privacy.md).
+
+## Comment format at a glance
+
+The sticky PR comment can include:
+
+- notebook change summaries
+- notebook-local reviewer guidance
+- flagged findings
+- an optional Claude summary block when Claude succeeds
+
+For a full static example, use [examples.md](examples.md).
 
 ## Troubleshooting
 

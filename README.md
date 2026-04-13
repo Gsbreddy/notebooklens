@@ -4,7 +4,7 @@
 
 Notebook-aware pull request review for Jupyter notebooks on GitHub. NotebookLens ships as two separate products that can coexist on the same PR: an OSS GitHub Action that posts one auto-updating PR comment with notebook-local reviewer guidance and optional Claude AI summaries, and an optional hosted review workspace beta that opens from a dedicated check run for notebook-aware diffs and inline threads.
 
-Published docs: [gsbreddy.github.io/notebooklens](https://gsbreddy.github.io/notebooklens/)
+Start with the published docs: [gsbreddy.github.io/notebooklens](https://gsbreddy.github.io/notebooklens/)
 
 ## Start Here
 
