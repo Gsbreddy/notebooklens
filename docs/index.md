@@ -67,7 +67,7 @@ If your team is running the hosted workspace itself, continue with:
 - [GitHub PR Sync](github-pr-sync.md)
 
 !!! info "Hosted workspace status"
-    The hosted review workspace is still **beta** in `v0.4.0-beta`. Start with the OSS Action if your team wants the lowest-risk first install.
+    The hosted review workspace is still **beta** in `v0.4.1-beta`. Start with the OSS Action if your team wants the lowest-risk first install.
 
 ## Examples
 
