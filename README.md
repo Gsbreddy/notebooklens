@@ -411,21 +411,13 @@ Prefer one central troubleshooting path for the Action and the hosted workspace 
 
 See [.github/notebooklens-pr.example.yml](.github/notebooklens-pr.example.yml) for a runnable baseline.
 
-## Project Docs
+## Docs & Repo
 
-- [Docs home](https://gsbreddy.github.io/notebooklens/) for the main user-facing docs entry
-- [OSS Action quick start](https://gsbreddy.github.io/notebooklens/quickstart-action/) for the shortest Action install path
-- [Hosted workspace beta quick start](https://gsbreddy.github.io/notebooklens/quickstart-workspace/) for the hosted review entry path
-- [Privacy and data flow](https://gsbreddy.github.io/notebooklens/privacy/) for permissions, fork behavior, and hard limits
-- [Troubleshooting](https://gsbreddy.github.io/notebooklens/troubleshooting/) for common first-run and operator debugging paths
-- [Examples](https://gsbreddy.github.io/notebooklens/examples/) for static OSS Action and hosted-workspace previews
-- [Self-hosting](https://gsbreddy.github.io/notebooklens/self-hosting/) for the Docker Compose managed-workspace runbook
-- [LiteLLM admin settings](https://gsbreddy.github.io/notebooklens/admin-ai-settings/) for installation-scoped managed AI configuration
-- [GitHub PR sync](https://gsbreddy.github.io/notebooklens/github-pr-sync/) for the GitHub mirror contract and fallback behavior
+- [Docs home](https://gsbreddy.github.io/notebooklens/) for the main user-facing guide
+- [Examples](https://gsbreddy.github.io/notebooklens/examples/) if you want to preview the product surfaces first
 - [CHANGELOG.md](CHANGELOG.md) for release notes
 - [SECURITY.md](SECURITY.md) for vulnerability reporting
 - [CONTRIBUTING.md](CONTRIBUTING.md) for local development and release process
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations
 
 ## License
 
