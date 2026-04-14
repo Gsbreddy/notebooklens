@@ -375,10 +375,9 @@ function NotebookCard({
   const visibleRows = notebook.render_rows.filter((row) => hasVisibleBlocks(row, threadsByAnchor));
 
   return (
-    <section className="notebook-card">
+    <section className="notebook-card notebook-card-flat">
       <div className="notebook-head">
         <div>
-          <p className="eyebrow">Changed notebook</p>
           <h2>{fileLabel}</h2>
           <p className="notebook-subpath">{directoryLabel}</p>
         </div>
@@ -415,7 +414,6 @@ function NotebookCard({
           <CellRowCard
             currentPath={currentPath}
             key={`${notebook.path}-${buildAnchorKey(row.thread_anchors.source)}`}
-            notebookPath={notebook.path}
             review={review}
             reviewId={reviewId}
             row={row}
@@ -434,7 +432,6 @@ type CellRowCardProps = {
   reviewId: string;
   snapshot: ReviewSnapshotRecord;
   row: RenderRow;
-  notebookPath: string;
   threadsByAnchor: Map<string, ReviewThread[]>;
   currentPath: string;
 };
@@ -445,7 +442,6 @@ function CellRowCard({
   reviewId,
   snapshot,
   row,
-  notebookPath,
   threadsByAnchor,
   currentPath,
 }: CellRowCardProps) {
@@ -453,7 +449,7 @@ function CellRowCard({
   const changedBlockCount = blocks.filter((blockKind) => isBlockChanged(row, blockKind)).length;
 
   return (
-    <article className="cell-card">
+    <article className="cell-card cell-card-flat">
       <div className="cell-card-head">
         <div>
           <p className="eyebrow">{formatCellLabel(row)}</p>
@@ -487,10 +483,9 @@ function CellRowCard({
           const threadable = canStartThread(review, snapshot, row, blockKind);
 
           return (
-            <section className="diff-block" key={blockKind}>
+            <section className="diff-block diff-block-flat" key={blockKind}>
               <div className="diff-block-head">
                 <div>
-                  <p className="eyebrow">Review Block</p>
                   <h4>{blockTitle(blockKind)}</h4>
                 </div>
                 <div className="diff-block-meta">
@@ -519,8 +514,6 @@ function CellRowCard({
           );
         })}
       </div>
-
-      <p className="notebook-path-caption">{notebookPath}</p>
     </article>
   );
 }
@@ -724,7 +717,7 @@ function ThreadCard({
   const authorLabel = thread.messages[0]?.author_login ?? "NotebookLens reviewer";
 
   return (
-    <article className="thread-card">
+    <article className="thread-card thread-card-flat">
       <div className="thread-head">
         <div className="thread-heading-copy">
           <strong>{authorLabel}</strong>
@@ -736,10 +729,9 @@ function ThreadCard({
         </div>
       </div>
 
-      <section className="mirror-card">
+      <section className="mirror-card mirror-card-inline">
         <div className="mirror-head">
           <div>
-            <p className="eyebrow">GitHub PR thread</p>
             <h6>{mirrorStatus.label}</h6>
           </div>
           <StatusPill label={mirrorStatus.label} tone={mirrorStatus.tone} />
