@@ -67,6 +67,7 @@ export function ReviewWorkspace({
         ? "Reviewing latest push"
         : `Reviewing push ${snapshot.snapshot_index}`;
   const reviewStatusLabel = formatReviewStatusLabel(workspace.review.status);
+  const installationLabel = `${workspace.review.installation.account_login} (${workspace.review.installation.account_type})`;
 
   return (
     <div className="workspace-shell">
@@ -99,29 +100,6 @@ export function ReviewWorkspace({
               tone="warning"
             />
           </div>
-        </div>
-        <div className="hero-actions workspace-header-actions">
-          <Link
-            className="secondary-button"
-            href={
-              buildAiGatewayRoute(
-                workspace.review.owner,
-                workspace.review.repo,
-                workspace.review.pull_number,
-              ) as Route
-            }
-          >
-            LiteLLM settings
-          </Link>
-          <a className="secondary-button" href={buildLoginHref(currentPath)}>
-            Refresh access
-          </a>
-          <form action={buildWorkspaceActionPath("logout")} method="post">
-            <input name="returnTo" type="hidden" value={currentPath} />
-            <button className="ghost-button" type="submit">
-              Sign out
-            </button>
-          </form>
         </div>
       </header>
 
@@ -229,48 +207,90 @@ export function ReviewWorkspace({
           </section>
 
           <section className="side-card">
-            <h2>Heads Up</h2>
-            {snapshot?.payload.review.notices?.length ? (
-              <ul className="chip-list">
-                {snapshot.payload.review.notices.map((notice) => (
-                  <li className="chip-item" key={notice}>
-                    {notice}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted-copy">No workspace-wide notes for this PR version.</p>
-            )}
+            <h2>Review signals</h2>
+
+            <div className="sidebar-subsection">
+              <p className="sidebar-subtitle">Heads up</p>
+              {snapshot?.payload.review.notices?.length ? (
+                <ul className="chip-list">
+                  {snapshot.payload.review.notices.map((notice) => (
+                    <li className="chip-item" key={notice}>
+                      {notice}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted-copy">No workspace-wide notes for this PR version.</p>
+              )}
+            </div>
+
+            <div className="sidebar-subsection">
+              <p className="sidebar-subtitle">Flagged findings</p>
+              {snapshot?.flagged_findings?.length ? (
+                <ul className="text-list">
+                  {snapshot.flagged_findings.map((finding, index) => (
+                    <li key={`${finding.code ?? "finding"}-${index}`}>
+                      {summarizeFinding(finding)}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted-copy">No flagged findings on this PR version.</p>
+              )}
+            </div>
+
+            <div className="sidebar-subsection">
+              <p className="sidebar-subtitle">Reviewer guidance</p>
+              {snapshot?.reviewer_guidance?.length ? (
+                <ul className="text-list">
+                  {snapshot.reviewer_guidance.map((guidance, index) => (
+                    <li key={`${guidance.label ?? "guidance"}-${index}`}>
+                      {summarizeGuidance(guidance)}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted-copy">No extra reviewer guidance for this PR version.</p>
+              )}
+            </div>
           </section>
 
-          <section className="side-card">
-            <h2>Flagged Findings</h2>
-            {snapshot?.flagged_findings?.length ? (
-              <ul className="text-list">
-                {snapshot.flagged_findings.map((finding, index) => (
-                  <li key={`${finding.code ?? "finding"}-${index}`}>
-                    {summarizeFinding(finding)}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted-copy">No flagged findings on this PR version.</p>
-            )}
-          </section>
-
-          <section className="side-card">
-            <h2>Reviewer Guidance</h2>
-            {snapshot?.reviewer_guidance?.length ? (
-              <ul className="text-list">
-                {snapshot.reviewer_guidance.map((guidance, index) => (
-                  <li key={`${guidance.label ?? "guidance"}-${index}`}>
-                    {summarizeGuidance(guidance)}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted-copy">No extra reviewer guidance for this PR version.</p>
-            )}
+          <section className="side-card side-card-muted">
+            <h2>Workspace access</h2>
+            <p className="muted-copy">
+              Use these controls when you need to refresh your session or adjust
+              installation-level settings. Most reviewers can stay focused on the
+              diff itself.
+            </p>
+            <div className="sidebar-action-stack">
+              <a className="secondary-button" href={buildLoginHref(currentPath)}>
+                Refresh access
+              </a>
+              <form action={buildWorkspaceActionPath("logout")} method="post">
+                <input name="returnTo" type="hidden" value={currentPath} />
+                <button className="ghost-button sidebar-full-width" type="submit">
+                  Sign out
+                </button>
+              </form>
+            </div>
+            <div className="sidebar-subsection sidebar-operator">
+              <p className="sidebar-subtitle">Operator tools</p>
+              <p className="muted-copy">
+                Installation-scoped AI controls apply across {installationLabel}.
+              </p>
+              <Link
+                className="text-link"
+                href={
+                  buildAiGatewayRoute(
+                    workspace.review.owner,
+                    workspace.review.repo,
+                    workspace.review.pull_number,
+                  ) as Route
+                }
+              >
+                Open LiteLLM settings
+              </Link>
+            </div>
           </section>
         </aside>
       </div>
