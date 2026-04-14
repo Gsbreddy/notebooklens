@@ -48,10 +48,9 @@ while True:
 PY
 }
 
-run_migrations
-
 case "${1:-}" in
   api)
+    run_migrations
     run_api
     ;;
   worker)

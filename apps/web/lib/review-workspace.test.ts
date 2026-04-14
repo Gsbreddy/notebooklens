@@ -4,10 +4,18 @@ import {
   buildAnchorKey,
   buildAiGatewayRoute,
   buildFlashRedirect,
+  buildWorkspaceActionPath,
   canStartThread,
+  getChangedBlockKinds,
+  getMeaningfulOutputItems,
+  getRowSignalSummary,
+  getVisibleBlockKinds,
   groupThreadsByAnchor,
+  hasMeaningfulBlockContent,
+  hasVisibleBlocks,
   isBlockChanged,
   summarizeGitHubMirrorStatus,
+  toggleThreadComposer,
 } from "@/lib/review-workspace";
 import type { RenderRow, ReviewSnapshotRecord, ReviewThread, WorkspaceReview } from "@/lib/types";
 
@@ -160,13 +168,29 @@ describe("review workspace helpers", () => {
   });
 
   it("only allows new threads on changed blocks in the latest ready snapshot", () => {
-    const row = buildRow();
+    const row = {
+      ...buildRow(),
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder" as const,
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+        ],
+      },
+    };
     const latestSnapshot = buildSnapshot("snapshot-2");
     const oldSnapshot = buildSnapshot("snapshot-1");
 
     expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, row, "outputs")).toBe(true);
     expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, row, "source")).toBe(false);
     expect(canStartThread(buildReview("snapshot-2"), oldSnapshot, row, "outputs")).toBe(false);
+    expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, buildRow(), "outputs")).toBe(false);
   });
 
   it("keeps flash redirects on the same route", () => {
@@ -178,6 +202,12 @@ describe("review workspace helpers", () => {
     ).toContain("/reviews/octo/notebooklens/pulls/7/snapshots/2?flash=error");
   });
 
+  it("keeps only one create-thread composer open at a time", () => {
+    expect(toggleThreadComposer(null, "anchor-a")).toBe("anchor-a");
+    expect(toggleThreadComposer("anchor-a", "anchor-b")).toBe("anchor-b");
+    expect(toggleThreadComposer("anchor-a", "anchor-a")).toBeNull();
+  });
+
   it("reports whether a specific block changed", () => {
     const row = buildRow();
 
@@ -185,10 +215,88 @@ describe("review workspace helpers", () => {
     expect(isBlockChanged(row, "metadata")).toBe(false);
   });
 
+  it("treats empty metadata and output blocks as not meaningful", () => {
+    const row = buildRow();
+
+    expect(hasMeaningfulBlockContent(row, "outputs")).toBe(false);
+    expect(hasMeaningfulBlockContent(row, "metadata")).toBe(false);
+    expect(hasMeaningfulBlockContent(row, "source")).toBe(true);
+  });
+
+  it("suppresses empty changed blocks when they have no threads", () => {
+    const row = buildRow();
+
+    expect(getVisibleBlockKinds(row, new Map())).toEqual([]);
+    expect(hasVisibleBlocks(row, new Map())).toBe(false);
+  });
+
+  it("keeps thread-only blocks visible even when the diff content is empty", () => {
+    const row = buildRow();
+    const thread = {
+      ...buildThread(row),
+      anchor: row.thread_anchors.outputs,
+    };
+    const threadsByAnchor = groupThreadsByAnchor([thread]);
+
+    expect(getVisibleBlockKinds(row, threadsByAnchor)).toEqual(["outputs"]);
+    expect(hasVisibleBlocks(row, threadsByAnchor)).toBe(true);
+  });
+
+  it("filters empty output placeholder cards out of a visible block", () => {
+    const row = {
+      ...buildRow(),
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder" as const,
+            output_type: "execute_result",
+            mime_group: "text",
+            summary: "   ",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+          {
+            kind: "placeholder" as const,
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+        ],
+      },
+    };
+
+    expect(getMeaningfulOutputItems(row)).toEqual([row.outputs.items[1]]);
+  });
+
+  it("returns the changed block kinds for compact row headers", () => {
+    expect(getChangedBlockKinds(buildRow())).toEqual(["outputs"]);
+  });
+
+  it("suppresses generic row summaries that only repeat diff metadata", () => {
+    const genericRow = {
+      ...buildRow(),
+      summary: "cell modified (outputs)",
+    };
+
+    expect(getRowSignalSummary(genericRow)).toBeNull();
+    expect(getRowSignalSummary(buildRow())).toBe("Metric output changed.");
+  });
+
   it("builds the review-scoped LiteLLM settings route", () => {
     expect(buildAiGatewayRoute("octo", "notebooklens", 7)).toBe(
       "/reviews/octo/notebooklens/pulls/7/settings/ai-gateway",
     );
+  });
+
+  it("builds stable post routes for review mutations", () => {
+    expect(buildWorkspaceActionPath("create-thread")).toBe("/actions/threads/create");
+    expect(buildWorkspaceActionPath("reply-thread")).toBe("/actions/threads/reply");
+    expect(buildWorkspaceActionPath("resolve-thread")).toBe("/actions/threads/resolve");
+    expect(buildWorkspaceActionPath("reopen-thread")).toBe("/actions/threads/reopen");
+    expect(buildWorkspaceActionPath("logout")).toBe("/actions/auth/logout");
   });
 
   it("summarizes mirrored GitHub threads", () => {

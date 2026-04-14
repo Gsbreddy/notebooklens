@@ -3,6 +3,7 @@ import type {
   RenderRow,
   ReviewSnapshotRecord,
   ReviewThread,
+  SnapshotBlockKind,
   ThreadAnchor,
   WorkspaceReview,
 } from "@/lib/types";
@@ -56,7 +57,96 @@ export function canStartThread(
   if (review.latest_snapshot_id !== snapshot.id) {
     return false;
   }
+  if (!hasMeaningfulBlockContent(row, blockKind)) {
+    return false;
+  }
   return isBlockChanged(row, blockKind);
+}
+
+
+export function hasMeaningfulBlockContent(
+  row: RenderRow,
+  blockKind: SnapshotBlockKind,
+): boolean {
+  if (blockKind === "source") {
+    return hasMeaningfulText(row.source.base) || hasMeaningfulText(row.source.head);
+  }
+  if (blockKind === "outputs") {
+    return row.outputs.items.some((item) => item.kind === "image" || hasMeaningfulText(item.summary));
+  }
+  return hasMeaningfulText(row.metadata.summary);
+}
+
+
+export function getVisibleBlockKinds(
+  row: RenderRow,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): SnapshotBlockKind[] {
+  return (["source", "outputs", "metadata"] as const).filter((blockKind) => {
+    const hasThreads = (threadsByAnchor.get(buildAnchorKey(row.thread_anchors[blockKind]))?.length ?? 0) > 0;
+    if (hasThreads) {
+      return true;
+    }
+    return isBlockChanged(row, blockKind) && hasMeaningfulBlockContent(row, blockKind);
+  });
+}
+
+
+export function hasVisibleBlocks(
+  row: RenderRow,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): boolean {
+  return getVisibleBlockKinds(row, threadsByAnchor).length > 0;
+}
+
+
+export function getMeaningfulOutputItems(
+  row: RenderRow,
+): RenderRow["outputs"]["items"] {
+  return row.outputs.items.filter((item) =>
+    item.kind === "image" || hasMeaningfulText(item.summary),
+  );
+}
+
+
+export function getChangedBlockKinds(row: RenderRow): SnapshotBlockKind[] {
+  return (["source", "outputs", "metadata"] as const).filter((blockKind) =>
+    isBlockChanged(row, blockKind),
+  );
+}
+
+
+export function getRowSignalSummary(row: RenderRow): string | null {
+  const summary = row.summary.trim();
+  if (!summary) {
+    return null;
+  }
+
+  const normalizedSummary = normalizeSummary(summary);
+  if (!normalizedSummary) {
+    return null;
+  }
+
+  const changedBlockLabels = getChangedBlockKinds(row).map((blockKind) =>
+    blockKind === "metadata" ? "material metadata" : blockKind,
+  );
+
+  const genericSummaries = new Set([
+    "cell added",
+    "cell deleted",
+    "cell modified",
+    "cell outputs changed",
+    "cell reordered without material content changes",
+  ]);
+
+  if (
+    genericSummaries.has(normalizedSummary) ||
+    normalizedSummary === `cell modified (${changedBlockLabels.join(", ")})`
+  ) {
+    return null;
+  }
+
+  return summary;
 }
 
 
@@ -93,6 +183,32 @@ export function buildAiGatewayRoute(
   pullNumber: number,
 ): string {
   return `/reviews/${owner}/${repo}/pulls/${pullNumber}/settings/ai-gateway`;
+}
+
+
+export function buildWorkspaceActionPath(
+  action: "create-thread" | "reply-thread" | "resolve-thread" | "reopen-thread" | "logout",
+): string {
+  switch (action) {
+    case "create-thread":
+      return "/actions/threads/create";
+    case "reply-thread":
+      return "/actions/threads/reply";
+    case "resolve-thread":
+      return "/actions/threads/resolve";
+    case "reopen-thread":
+      return "/actions/threads/reopen";
+    case "logout":
+      return "/actions/auth/logout";
+  }
+}
+
+
+export function toggleThreadComposer(
+  currentComposerKey: string | null,
+  requestedComposerKey: string,
+): string | null {
+  return currentComposerKey === requestedComposerKey ? null : requestedComposerKey;
 }
 
 
@@ -217,4 +333,17 @@ function firstValue(value: string | string[] | undefined): string | null {
     return value[0] ?? null;
   }
   return value ?? null;
+}
+
+
+function normalizeSummary(summary: string): string {
+  return summary
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "");
+}
+
+
+function hasMeaningfulText(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0;
 }
