@@ -1,8 +1,8 @@
 :root {
-  --bg: #efe7dc;
-  --panel: rgba(255, 251, 244, 0.9);
-  --panel-strong: #fffdf8;
-  --line: rgba(36, 39, 45, 0.12);
+  --bg: #e4dcd1;
+  --panel: rgba(249, 245, 238, 0.94);
+  --panel-strong: rgba(255, 254, 250, 0.98);
+  --line: rgba(36, 39, 45, 0.16);
   --ink: #1f252d;
   --muted: #5f6670;
   --accent: #c55a24;
@@ -10,10 +10,10 @@
   --success: #1f7a5c;
   --warning: #996c13;
   --danger: #ab3940;
-  --shadow: 0 24px 80px rgba(74, 47, 24, 0.12);
-  --radius-lg: 28px;
-  --radius-md: 18px;
-  --radius-sm: 12px;
+  --shadow: 0 10px 28px rgba(57, 42, 26, 0.08);
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
   --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 }
@@ -30,9 +30,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(197, 90, 36, 0.2), transparent 32%),
-    radial-gradient(circle at top right, rgba(31, 122, 92, 0.14), transparent 30%),
-    linear-gradient(180deg, #f4eee4 0%, var(--bg) 48%, #e6ddd2 100%);
+    radial-gradient(circle at top left, rgba(197, 90, 36, 0.12), transparent 26%),
+    radial-gradient(circle at top right, rgba(31, 122, 92, 0.07), transparent 24%),
+    linear-gradient(180deg, #eee7dc 0%, var(--bg) 44%, #d8d0c4 100%);
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -43,8 +43,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(31, 37, 45, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31, 37, 45, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(31, 37, 45, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 37, 45, 0.015) 1px, transparent 1px);
   background-size: 32px 32px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 90%);
 }
@@ -69,7 +69,7 @@ pre {
 .workspace-shell {
   width: min(1480px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 18px 0 48px;
+  padding: 14px 0 36px;
 }
 
 .center-stage {
@@ -86,7 +86,7 @@ pre {
 
 .workspace-grid {
   display: grid;
-  gap: 24px;
+  gap: 20px;
   grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
   align-items: start;
 }
@@ -124,8 +124,8 @@ pre {
 
 .workspace-sidebar {
   position: sticky;
-  top: 20px;
-  gap: 16px;
+  top: 16px;
+  gap: 14px;
 }
 
 .hero-card,
@@ -138,7 +138,7 @@ pre {
   background: var(--panel);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(8px);
 }
 
 .hero-card,
@@ -158,13 +158,13 @@ pre {
 .summary-card,
 .side-card,
 .notebook-card {
-  padding: 24px;
+  padding: 20px 22px;
 }
 
 .cell-card,
 .diff-block,
 .thread-card {
-  padding: 20px;
+  padding: 16px 18px;
 }
 
 .compact-card {
@@ -175,14 +175,14 @@ pre {
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .workspace-header {
   align-items: center;
   gap: 16px;
-  padding: 18px 20px;
-  margin-bottom: 16px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
 }
 
 .workspace-pr-strip {
@@ -190,8 +190,8 @@ pre {
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, auto);
   gap: 14px 20px;
   align-items: center;
-  padding: 14px 18px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
 }
 
 .workspace-pr-strip-main,
@@ -265,8 +265,8 @@ pre {
 }
 
 .workspace-meta {
-  margin-top: 12px;
-  gap: 10px;
+  margin-top: 10px;
+  gap: 8px;
 }
 
 .landing-hero {
@@ -382,7 +382,7 @@ pre {
 }
 
 .landing-feature {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--panel-strong);
@@ -394,10 +394,10 @@ pre {
 }
 
 .landing-check {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 217, 197, 0.16));
+  background: var(--panel-strong);
 }
 
 .landing-check p {
@@ -428,13 +428,13 @@ pre {
 }
 
 .summary-grid {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .snapshot-overview-card {
   display: grid;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 12px 16px;
 }
 
 .snapshot-overview-head {
@@ -454,7 +454,7 @@ pre {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
-  margin-top: 14px;
+  margin-top: 12px;
   color: var(--muted);
   font-size: 0.92rem;
 }
@@ -480,7 +480,7 @@ pre {
   justify-content: space-between;
   gap: 12px;
   padding: 0 14px;
-  min-height: 40px;
+  min-height: 36px;
   border-radius: 999px;
   background: rgba(31, 37, 45, 0.05);
   color: var(--ink);
@@ -504,7 +504,7 @@ pre {
 
 .snapshot-disclosure[open],
 .notebook-jump-card[open] {
-  gap: 12px;
+  gap: 10px;
 }
 
 .snapshot-disclosure[open] summary,
@@ -514,7 +514,7 @@ pre {
 
 .snapshot-disclosure-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .snapshot-overview-stats {
@@ -524,7 +524,7 @@ pre {
 }
 
 .notebook-jump-card {
-  padding: 14px 18px;
+  padding: 12px 16px;
 }
 
 .notebook-jump-grid {
@@ -558,7 +558,7 @@ pre {
 
 .summary-metric {
   min-width: 140px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--panel-strong);
   border: 1px solid var(--line);
@@ -589,7 +589,7 @@ pre {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 0.48rem 0.85rem;
+  padding: 0.42rem 0.8rem;
   border-radius: 999px;
   font-size: 0.88rem;
   font-weight: 700;
@@ -661,7 +661,7 @@ pre {
 
 .secondary-button {
   background: var(--panel-strong);
-  border: 1px solid rgba(197, 90, 36, 0.16);
+  border: 1px solid rgba(36, 39, 45, 0.12);
   color: var(--ink);
 }
 
@@ -688,9 +688,9 @@ pre {
 }
 
 .flash-banner {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   border-radius: var(--radius-md);
-  padding: 16px 18px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
   font-weight: 700;
 }
@@ -709,7 +709,7 @@ pre {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--panel-strong);
   border: 1px solid transparent;
@@ -717,12 +717,12 @@ pre {
 
 .history-link-active {
   border-color: rgba(197, 90, 36, 0.18);
-  background: linear-gradient(180deg, rgba(247, 217, 197, 0.62), rgba(255, 253, 248, 0.95));
+  background: linear-gradient(180deg, rgba(247, 217, 197, 0.36), rgba(255, 254, 250, 0.98));
 }
 
 .notebook-card-flat {
-  padding: 18px 20px;
-  box-shadow: 0 14px 34px rgba(74, 47, 24, 0.08);
+  padding: 16px 18px;
+  box-shadow: 0 8px 22px rgba(57, 42, 26, 0.06);
 }
 
 .notebook-subpath {
@@ -733,13 +733,13 @@ pre {
 
 .notebook-stats {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .notebook-stat {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   background: var(--panel-strong);
   border: 1px solid var(--line);
@@ -771,7 +771,7 @@ pre {
 .chip-item {
   display: inline-flex;
   width: fit-content;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 999px;
   background: rgba(31, 37, 45, 0.06);
 }
@@ -782,7 +782,7 @@ pre {
 }
 
 .sidebar-subsection + .sidebar-subsection {
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid rgba(36, 39, 45, 0.08);
 }
 
@@ -796,8 +796,8 @@ pre {
 }
 
 .side-card-muted {
-  background: rgba(255, 251, 244, 0.68);
-  box-shadow: 0 18px 50px rgba(74, 47, 24, 0.08);
+  background: rgba(243, 238, 231, 0.92);
+  box-shadow: 0 6px 18px rgba(57, 42, 26, 0.05);
 }
 
 .sidebar-action-stack {
@@ -841,7 +841,7 @@ pre {
 }
 
 .cell-card-flat {
-  padding: 16px 0 0;
+  padding: 14px 0 0;
   background: transparent;
   border: 0;
   border-top: 1px solid rgba(36, 39, 45, 0.08);
@@ -859,7 +859,7 @@ pre {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .context-pill {
@@ -885,7 +885,7 @@ pre {
   border-radius: var(--radius-md);
   background: var(--panel-strong);
   border: 1px solid var(--line);
-  padding: 14px;
+  padding: 12px;
 }
 
 .code-pane pre,
@@ -930,8 +930,8 @@ pre {
 .thread-column {
   display: grid;
   gap: 10px;
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid rgba(36, 39, 45, 0.08);
 }
 
@@ -963,7 +963,7 @@ pre {
 .settings-form input,
 .settings-form select {
   width: 100%;
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.8);
@@ -1022,7 +1022,7 @@ pre {
 .reply-details summary {
   display: inline-flex;
   align-items: center;
-  min-height: 42px;
+  min-height: 38px;
   border-radius: 999px;
   padding: 0 16px;
   background: rgba(31, 37, 45, 0.06);
@@ -1049,7 +1049,7 @@ pre {
 }
 
 .diff-block-flat {
-  padding: 12px 0 0 14px;
+  padding: 10px 0 0 12px;
   background: transparent;
   border: 0;
   border-left: 2px solid rgba(36, 39, 45, 0.12);
@@ -1059,16 +1059,16 @@ pre {
 }
 
 .diff-block-flat .diff-block-head {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .diff-block-flat + .diff-block-flat {
-  padding-top: 10px;
+  padding-top: 8px;
 }
 
 .thread-card-flat {
-  padding: 12px 14px;
-  background: rgba(255, 253, 248, 0.74);
+  padding: 10px 12px;
+  background: rgba(255, 254, 250, 0.9);
   border: 1px solid rgba(36, 39, 45, 0.08);
   box-shadow: none;
 }
@@ -1109,8 +1109,8 @@ pre {
 }
 
 .thread-secondary-row-expanded {
-  padding: 8px 10px;
-  border-radius: 14px;
+  padding: 7px 9px;
+  border-radius: 12px;
   background: rgba(31, 37, 45, 0.04);
 }
 
@@ -1131,12 +1131,12 @@ pre {
 
 .settings-form {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .settings-section {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .settings-section-head {
@@ -1233,7 +1233,7 @@ pre {
 @media (max-width: 720px) {
   .workspace-shell {
     width: min(100vw - 20px, 100%);
-    padding-top: 12px;
+    padding-top: 10px;
   }
 
   .hero-card,
@@ -1243,8 +1243,8 @@ pre {
   .cell-card,
   .diff-block,
   .thread-card {
-    padding: 18px;
-    border-radius: 20px;
+    padding: 16px;
+    border-radius: 16px;
   }
 
   .cell-card-flat,
@@ -1255,13 +1255,13 @@ pre {
   .workspace-pr-strip,
   .snapshot-overview-card,
   .notebook-jump-card {
-    padding: 14px;
+    padding: 12px;
   }
 
   .diff-block-flat {
     border-left: 0;
     border-top: 1px solid rgba(36, 39, 45, 0.08);
-    padding-top: 12px;
+    padding-top: 10px;
   }
 
   .code-grid {
