@@ -292,6 +292,10 @@ pre {
   min-height: 100%;
 }
 
+.landing-card-primary {
+  grid-column: span 2;
+}
+
 .landing-card-wide {
   grid-column: 1 / -1;
 }
@@ -317,6 +321,22 @@ pre {
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--panel-strong);
+}
+
+.landing-checks {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-check {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 217, 197, 0.16));
+}
+
+.landing-check p {
+  margin: 8px 0 0;
 }
 
 .wall-card {
@@ -995,6 +1015,10 @@ pre {
 
   .landing-grid {
     grid-template-columns: 1fr;
+  }
+
+  .landing-card-primary {
+    grid-column: auto;
   }
 
   .two-column-feature-stack,
