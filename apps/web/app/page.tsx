@@ -5,7 +5,46 @@ const WORKSPACE_QUICKSTART_URL =
 const EXAMPLES_URL = "https://notebooklens.github.io/notebooklens/examples/";
 const REPOSITORY_URL = "https://github.com/notebooklens/notebooklens";
 
-export default function HomePage() {
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function readSearchParam(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = searchParams[key];
+  if (typeof value === "string" && value.length > 0) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.find((item) => item.length > 0) ?? null;
+  }
+  return null;
+}
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const resolvedSearchParams = await searchParams;
+  const installationId = readSearchParam(
+    resolvedSearchParams,
+    "installation_id",
+  );
+  const setupAction = readSearchParam(resolvedSearchParams, "setup_action");
+  const isReturningFromInstall =
+    installationId !== null && setupAction === "install";
+  const primaryHref = isReturningFromInstall
+    ? WORKSPACE_QUICKSTART_URL
+    : buildLoginHref("/");
+  const primaryLabel = isReturningFromInstall
+    ? "Open workspace quick start"
+    : "Continue with GitHub";
+  const primaryTitle = isReturningFromInstall
+    ? "Finish opening the review flow"
+    : "Open the workspace with GitHub";
+  const primaryCopy = isReturningFromInstall
+    ? "NotebookLens already received your GitHub App setup handoff. Continue with the quick start to open a notebook pull request and launch the review workspace check run."
+    : "Start with the GitHub account that already has access to the repository and pull request.";
+
   return (
     <main className="center-stage home-stage">
       <section className="hero-card landing-hero landing-hero-priority">
@@ -23,28 +62,56 @@ export default function HomePage() {
         </div>
 
         <div className="landing-hero-panel">
-          <p className="eyebrow">Primary path</p>
-          <h2>Open the workspace with GitHub</h2>
-          <p className="muted-copy">
-            Use the GitHub account that already has access to the repository
-            and pull request.
-          </p>
+          <p className="eyebrow">Next step</p>
+          <h2>{primaryTitle}</h2>
+          <p className="muted-copy">{primaryCopy}</p>
           <div className="hero-actions landing-actions landing-hero-actions">
-            <a className="primary-button" href={buildLoginHref("/")}>
-              Sign in with GitHub
+            <a
+              className="primary-button"
+              href={primaryHref}
+              rel={isReturningFromInstall ? "noreferrer" : undefined}
+              target={isReturningFromInstall ? "_blank" : undefined}
+            >
+              {primaryLabel}
             </a>
           </div>
           <p className="hero-subsummary landing-hero-note">
-            Need to install the GitHub App first?{" "}
-            <a
-              className="landing-inline-link"
-              href={WORKSPACE_QUICKSTART_URL}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Open workspace quick start
-            </a>
-            .
+            {isReturningFromInstall ? (
+              <>
+                Need a second proof point before you run it? Check the{" "}
+                <a
+                  className="landing-inline-link"
+                  href={EXAMPLES_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  current examples
+                </a>{" "}
+                and{" "}
+                <a
+                  className="landing-inline-link"
+                  href={REPOSITORY_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  repository docs
+                </a>
+                .
+              </>
+            ) : (
+              <>
+                The one-time repository setup lives in the{" "}
+                <a
+                  className="landing-inline-link"
+                  href={WORKSPACE_QUICKSTART_URL}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  workspace quick start
+                </a>
+                .
+              </>
+            )}
           </p>
         </div>
       </section>
@@ -137,22 +204,25 @@ export default function HomePage() {
         </article>
 
         <article className="summary-card landing-support-card">
-          <p className="eyebrow">Need setup first?</p>
-          <h2>Install the GitHub App review flow</h2>
+          <p className="eyebrow">One setup reference</p>
+          <h2>Keep setup details in one place</h2>
           <p className="muted-copy">
-            Use the quick start to install the app, open a notebook pull
-            request, and launch the review workspace check run.
+            When a repository still needs the GitHub App, the first notebook
+            pull request, or the review workspace check run, the workspace
+            quick start covers that one-time checklist end to end.
           </p>
-          <a
-            className="secondary-button"
-            href={WORKSPACE_QUICKSTART_URL}
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open workspace quick start
-          </a>
           <p className="hero-subsummary landing-support-copy">
-            Need the full flow or a second proof point? Check the{" "}
+            Use the{" "}
+            <a
+              className="landing-inline-link"
+              href={WORKSPACE_QUICKSTART_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              workspace quick start
+            </a>{" "}
+            for setup details. Need the full flow or a second proof point?
+            Check the{" "}
             <a
               className="landing-inline-link"
               href={EXAMPLES_URL}

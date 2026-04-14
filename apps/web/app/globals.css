@@ -576,10 +576,8 @@ pre {
 
 .landing-support-card {
   align-self: start;
-}
-
-.landing-support-card .secondary-button {
-  width: fit-content;
+  background: rgba(250, 248, 243, 0.68);
+  box-shadow: none;
 }
 
 .landing-grid {
