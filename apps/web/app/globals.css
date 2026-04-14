@@ -285,6 +285,11 @@ pre {
   align-items: flex-end;
 }
 
+.landing-hero-compact {
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
 .hero-copy {
   max-width: 760px;
 }
@@ -355,6 +360,113 @@ pre {
 
 .landing-actions {
   min-width: min(280px, 100%);
+}
+
+.landing-support-copy {
+  max-width: 58ch;
+}
+
+.landing-inline-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+}
+
+.landing-proof-layout {
+  width: min(1180px, 100%);
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr);
+  align-items: start;
+}
+
+.landing-proof-card,
+.landing-path-card {
+  display: grid;
+  gap: 18px;
+}
+
+.landing-proof-stack,
+.landing-path-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.landing-checkrun-card,
+.landing-proof-surface,
+.landing-proof-thread {
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+}
+
+.landing-checkrun-card {
+  background: linear-gradient(180deg, rgba(247, 217, 197, 0.28), rgba(255, 254, 250, 0.98));
+}
+
+.landing-checkrun-head,
+.landing-proof-strip,
+.landing-proof-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.landing-checkrun-head,
+.landing-proof-strip {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.landing-checkrun-copy,
+.landing-proof-footnote {
+  margin: 8px 0 0;
+}
+
+.landing-proof-surface {
+  display: grid;
+  gap: 14px;
+}
+
+.landing-proof-strip {
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(36, 39, 45, 0.08);
+}
+
+.landing-proof-title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.landing-proof-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.landing-proof-metric {
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.landing-proof-list {
+  margin: 0;
+}
+
+.landing-proof-thread {
+  display: grid;
+  gap: 6px;
+  background: rgba(31, 122, 92, 0.08);
+  border-color: rgba(31, 122, 92, 0.16);
+}
+
+.landing-path-card .primary-button,
+.landing-path-card .secondary-button {
+  width: 100%;
 }
 
 .landing-grid {
@@ -1381,10 +1493,15 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .landing-proof-layout {
+    grid-template-columns: 1fr;
+  }
+
   .landing-card-primary {
     grid-column: auto;
   }
 
+  .landing-proof-grid,
   .two-column-feature-stack,
   .snapshot-overview-stats {
     grid-template-columns: 1fr;

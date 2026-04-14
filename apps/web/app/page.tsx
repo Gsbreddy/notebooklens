@@ -1,123 +1,137 @@
 import { buildLoginHref } from "@/lib/api";
 
+const WORKSPACE_QUICKSTART_URL =
+  "https://notebooklens.github.io/notebooklens/quickstart-workspace/";
+const EXAMPLES_URL = "https://notebooklens.github.io/notebooklens/examples/";
+const REPOSITORY_URL = "https://github.com/notebooklens/notebooklens";
+
 export default function HomePage() {
   return (
     <main className="center-stage home-stage">
-      <section className="hero-card landing-hero">
+      <section className="hero-card landing-hero landing-hero-compact">
         <div className="hero-copy">
           <p className="eyebrow">NotebookLens Review Workspace</p>
-          <h1>Review notebook changes without decoding raw JSON diffs</h1>
+          <h1>Review notebook pull requests in one workspace instead of decoding raw <code>.ipynb</code> diffs.</h1>
           <p className="hero-summary">
-            NotebookLens turns changed <code>.ipynb</code> files into a
-            review workspace with visual diffs, changed outputs, reviewer
-            guidance, and inline discussion.
+            Open the GitHub check run and land on the latest notebook snapshot
+            with changed cells, outputs, and inline threads already anchored to
+            the parts reviewers need to inspect.
           </p>
-          <p className="hero-subsummary">
-            Open the GitHub check run and land on one reviewer-oriented page with the
-            notebook context that usually gets lost: changed cells, outputs, PR version
-            history, and inline threads.
+          <p className="hero-subsummary landing-support-copy">
+            Need the full flow or a second proof point? Check the{" "}
+            <a
+              className="landing-inline-link"
+              href={EXAMPLES_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              current examples
+            </a>{" "}
+            and{" "}
+            <a
+              className="landing-inline-link"
+              href={REPOSITORY_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              repository docs
+            </a>
+            .
           </p>
-          <div className="hero-meta">
-            <span className="status-pill tone-accent">Managed workspace beta</span>
-            <span className="status-pill tone-default">Built for DS and ML teams</span>
-            <span className="status-pill tone-success">GitHub App + OAuth</span>
-          </div>
-        </div>
-
-        <div className="hero-actions landing-actions">
-          <a className="primary-button" href={buildLoginHref("/")}>
-            Sign in with GitHub
-          </a>
-          <a
-            className="secondary-button"
-            href="https://github.com/Gsbreddy/notebooklens#readme"
-            rel="noreferrer"
-            target="_blank"
-          >
-            Read setup docs
-          </a>
         </div>
       </section>
 
-      <section className="landing-grid">
-        <article className="summary-card landing-card landing-card-primary">
-          <p className="eyebrow">Why Reviewers Like It</p>
-          <h2>See the notebook context that PR diffs usually hide</h2>
-          <div className="landing-feature-stack">
-            <div className="landing-feature">
-              <strong>Notebook-aware diffs</strong>
-              <p className="muted-copy">
-                Compare source, outputs, metadata, and rendered images in one review surface.
+      <section className="landing-proof-layout">
+        <article className="summary-card landing-proof-card">
+          <div className="summary-head">
+            <div>
+              <p className="eyebrow">Proof</p>
+              <h2>What reviewers actually open</h2>
+              <p className="summary-text">
+                A compact view of the current GitHub check run plus the
+                notebook-aware workspace it opens.
               </p>
             </div>
-            <div className="landing-feature">
-              <strong>Inline review threads</strong>
-              <p className="muted-copy">
-                Keep questions and follow-ups attached to the exact changed block under review.
+          </div>
+
+          <div className="landing-proof-stack">
+            <div className="landing-checkrun-card">
+              <div className="landing-checkrun-head">
+                <strong>NotebookLens Review Workspace</strong>
+                <span className="status-pill tone-default">latest snapshot ready</span>
+              </div>
+              <p className="landing-checkrun-copy">
+                1 open thread · 0 resolved · Open in NotebookLens
               </p>
             </div>
-            <div className="landing-feature">
-              <strong>PR version history</strong>
-              <p className="muted-copy">
-                Revisit earlier pushes without losing the context around why something changed.
-              </p>
+
+            <div className="landing-proof-surface">
+              <div className="landing-proof-strip">
+                <div>
+                  <p className="eyebrow">Workspace snapshot</p>
+                  <h3 className="landing-proof-title">acme/forecasting · PR #128</h3>
+                </div>
+                <div className="landing-proof-meta">
+                  <span className="status-pill tone-default">reviewing latest push</span>
+                  <span className="status-pill tone-accent">1 open</span>
+                </div>
+              </div>
+
+              <div className="landing-proof-grid">
+                <div className="summary-metric landing-proof-metric">
+                  <span className="summary-label">Notebook</span>
+                  <strong>sales_forecast.ipynb</strong>
+                </div>
+                <div className="summary-metric landing-proof-metric">
+                  <span className="summary-label">Review surface</span>
+                  <strong>Changed output plot + markdown diff</strong>
+                </div>
+              </div>
+
+              <ul className="landing-list landing-proof-list">
+                <li>Inspect the changed notebook output without leaving the review surface.</li>
+                <li>See the latest snapshot context before replying on the PR.</li>
+                <li>Keep one inline thread attached to the exact changed block.</li>
+              </ul>
+
+              <div className="landing-proof-thread">
+                <span className="summary-label">Open thread</span>
+                <strong>Explain whether the widened confidence band is expected.</strong>
+              </div>
             </div>
           </div>
         </article>
 
-        <article className="summary-card landing-card">
-          <p className="eyebrow">Fastest Way To Try It</p>
-          <h2>Most teams can evaluate NotebookLens in one PR</h2>
-          <ol className="landing-list">
-            <li>Install the NotebookLens GitHub App on a repo with notebooks.</li>
-            <li>Open or update a pull request with notebook changes.</li>
-            <li>Open the “NotebookLens Review Workspace” check run from GitHub.</li>
-            <li>Sign in with GitHub if prompted.</li>
-            <li>Review the latest notebook changes and start threads where they matter.</li>
-          </ol>
-          <p className="muted-copy">
-            Hosted access is still beta, so some teams will still be onboarding or using self-hosted deployments.
-          </p>
-        </article>
+        <div className="landing-path-stack">
+          <article className="summary-card landing-path-card">
+            <p className="eyebrow">Install path</p>
+            <h2>Set up the GitHub App review flow</h2>
+            <p className="muted-copy">
+              Use the current workspace quick start to install the app, open a
+              notebook PR, and launch the check run.
+            </p>
+            <a
+              className="primary-button"
+              href={WORKSPACE_QUICKSTART_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open workspace quick start
+            </a>
+          </article>
 
-        <article className="summary-card landing-card">
-          <p className="eyebrow">What You Need</p>
-          <h2>Just enough to open a review</h2>
-          <div className="landing-checks">
-            <div className="landing-check">
-              <strong>GitHub App installed</strong>
-              <p className="muted-copy">NotebookLens needs repo access before a workspace check run can appear.</p>
-            </div>
-            <div className="landing-check">
-              <strong>Notebook PR</strong>
-              <p className="muted-copy">The hosted workspace opens for pull requests that actually include <code>.ipynb</code> changes.</p>
-            </div>
-            <div className="landing-check">
-              <strong>Repo access</strong>
-              <p className="muted-copy">Use a GitHub account that can already see the target repository and pull request.</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="summary-card landing-card landing-card-wide">
-          <p className="eyebrow">What Opens In The Workspace</p>
-          <h2>One review surface for the parts that usually get lost</h2>
-          <div className="landing-feature-stack two-column-feature-stack">
-            <div className="landing-feature">
-              <strong>Stay anchored to GitHub</strong>
-              <p className="muted-copy">
-                Reviews still start from a PR check run, so teams stay in the repo workflow they already use.
-              </p>
-            </div>
-            <div className="landing-feature">
-              <strong>See the context reviewers actually need</strong>
-              <p className="muted-copy">
-                Changed outputs, notebook context, and inline threads stay attached to
-                the exact notebook sections under review.
-              </p>
-            </div>
-          </div>
-        </article>
+          <article className="summary-card landing-path-card">
+            <p className="eyebrow">Sign-in path</p>
+            <h2>Open the workspace with GitHub</h2>
+            <p className="muted-copy">
+              Sign in with the GitHub account that already has access to the
+              repository and pull request.
+            </p>
+            <a className="secondary-button" href={buildLoginHref("/")}>
+              Sign in with GitHub
+            </a>
+          </article>
+        </div>
       </section>
     </main>
   );
