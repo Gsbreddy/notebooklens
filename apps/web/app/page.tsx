@@ -56,57 +56,83 @@ export default function HomePage() {
               <p className="eyebrow">After sign-in</p>
               <h2>What reviewers actually open</h2>
               <p className="summary-text">
-                A compact view of the current GitHub check run plus the
-                notebook-aware workspace it opens on the latest push.
+                An illustrated snapshot of the current GitHub check run plus
+                the notebook-aware workspace it opens on the latest push.
               </p>
             </div>
           </div>
 
           <div className="landing-proof-stack">
-            <div className="landing-checkrun-card">
-              <div className="landing-checkrun-head">
-                <strong>NotebookLens Review Workspace</strong>
-                <span className="status-pill tone-default">latest push ready</span>
-              </div>
-              <p className="landing-checkrun-copy">
-                1 open thread · 0 resolved · Open in GitHub
-              </p>
-            </div>
+            <figure
+              aria-labelledby="landing-proof-preview-caption"
+              className="landing-proof-figure"
+            >
+              <figcaption
+                className="landing-proof-banner"
+                id="landing-proof-preview-caption"
+              >
+                <span className="landing-proof-banner-label">
+                  Illustration only
+                </span>
+                <span className="landing-proof-banner-copy">
+                  Static preview of the GitHub check run opening the latest
+                  notebook-aware review workspace.
+                </span>
+              </figcaption>
 
-            <div className="landing-proof-surface">
-              <div className="landing-proof-strip">
-                <div>
-                  <p className="eyebrow">Latest push</p>
-                  <h3 className="landing-proof-title">acme/forecasting · PR #128</h3>
+              <div className="landing-checkrun-card">
+                <div className="landing-checkrun-head">
+                  <strong>NotebookLens Review Workspace</strong>
+                  <span className="status-pill tone-default">
+                    latest push ready
+                  </span>
                 </div>
-                <div className="landing-proof-meta">
-                  <span className="status-pill tone-default">reviewing latest push</span>
-                  <span className="status-pill tone-accent">1 open</span>
-                </div>
-              </div>
-
-              <div className="landing-proof-grid">
-                <div className="summary-metric landing-proof-metric">
-                  <span className="summary-label">Notebook</span>
-                  <strong>sales_forecast.ipynb</strong>
-                </div>
-                <div className="summary-metric landing-proof-metric">
-                  <span className="summary-label">What changed</span>
-                  <strong>Changed output plot + markdown diff</strong>
-                </div>
+                <p className="landing-checkrun-copy">
+                  1 open thread · 0 resolved · GitHub handoff to workspace
+                </p>
               </div>
 
-              <ul className="landing-list landing-proof-list">
-                <li>Inspect the changed notebook output without leaving the review.</li>
-                <li>See the latest push context before replying on the PR.</li>
-                <li>Keep one inline thread attached to the exact changed block.</li>
-              </ul>
+              <div className="landing-proof-surface">
+                <div className="landing-proof-strip">
+                  <div>
+                    <p className="eyebrow">Workspace preview</p>
+                    <h3 className="landing-proof-title">
+                      acme/forecasting · PR #128
+                    </h3>
+                  </div>
+                  <div className="landing-proof-meta">
+                    <span className="status-pill tone-default">
+                      reviewing latest push
+                    </span>
+                    <span className="status-pill tone-accent">1 open</span>
+                  </div>
+                </div>
 
-              <div className="landing-proof-thread">
-                <span className="summary-label">Open thread</span>
-                <strong>Explain whether the widened confidence band is expected.</strong>
+                <div className="landing-proof-grid">
+                  <div className="summary-metric landing-proof-metric">
+                    <span className="summary-label">Notebook</span>
+                    <strong>sales_forecast.ipynb</strong>
+                  </div>
+                  <div className="summary-metric landing-proof-metric">
+                    <span className="summary-label">What changed</span>
+                    <strong>Changed output plot + markdown diff</strong>
+                  </div>
+                </div>
+
+                <ul className="landing-list landing-proof-list">
+                  <li>Changed notebook output stays visible inside the review.</li>
+                  <li>Latest push context stays attached before replying on the PR.</li>
+                  <li>Inline discussion stays anchored to the exact changed block.</li>
+                </ul>
+
+                <div className="landing-proof-thread">
+                  <span className="summary-label">Example thread</span>
+                  <strong>
+                    Explain whether the widened confidence band is expected.
+                  </strong>
+                </div>
               </div>
-            </div>
+            </figure>
           </div>
         </article>
 

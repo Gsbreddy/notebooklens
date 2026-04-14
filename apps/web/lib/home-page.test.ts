@@ -25,4 +25,13 @@ describe("HomePage", () => {
     expect(html).toContain("Need setup first?");
     expect(html).toContain("Open workspace quick start");
   });
+
+  it("marks the reviewer proof panel as an illustration instead of a live thread surface", () => {
+    const html = renderToStaticMarkup(React.createElement(HomePage));
+
+    expect(html).toContain("Illustration only");
+    expect(html).toContain("Static preview of the GitHub check run");
+    expect(html).toContain("Example thread");
+    expect(html).not.toContain("Open thread");
+  });
 });

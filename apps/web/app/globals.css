@@ -447,9 +447,49 @@ pre {
   backdrop-filter: none;
 }
 
+.landing-proof-card {
+  background: rgba(249, 245, 238, 0.76);
+  box-shadow: 0 4px 14px rgba(57, 42, 26, 0.04);
+}
+
 .landing-proof-stack {
   display: grid;
   gap: 12px;
+}
+
+.landing-proof-figure {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px dashed rgba(36, 39, 45, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 254, 250, 0.6), rgba(255, 252, 246, 0.48)),
+    rgba(250, 248, 243, 0.56);
+}
+
+.landing-proof-banner {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(36, 39, 45, 0.08);
+  background: rgba(36, 39, 45, 0.04);
+}
+
+.landing-proof-banner-label {
+  color: var(--muted);
+  font-size: 0.77rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.landing-proof-banner-copy {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .landing-checkrun-card,
@@ -462,7 +502,8 @@ pre {
 }
 
 .landing-checkrun-card {
-  background: rgba(247, 217, 197, 0.2);
+  background: rgba(247, 217, 197, 0.14);
+  border-color: rgba(36, 39, 45, 0.08);
 }
 
 .landing-checkrun-head,
@@ -487,6 +528,8 @@ pre {
 .landing-proof-surface {
   display: grid;
   gap: 12px;
+  background: rgba(255, 254, 250, 0.64);
+  border-color: rgba(36, 39, 45, 0.08);
 }
 
 .landing-proof-strip {
@@ -519,11 +562,16 @@ pre {
   line-height: 1.55;
 }
 
+.landing-proof-figure .status-pill {
+  font-size: 0.82rem;
+  opacity: 0.82;
+}
+
 .landing-proof-thread {
   display: grid;
   gap: 6px;
-  background: rgba(31, 122, 92, 0.06);
-  border-color: rgba(31, 122, 92, 0.12);
+  background: rgba(36, 39, 45, 0.04);
+  border-color: rgba(36, 39, 45, 0.08);
 }
 
 .landing-support-card {
