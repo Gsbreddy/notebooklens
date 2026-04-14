@@ -35,7 +35,15 @@ export async function ReviewRoute(props: ReviewRouteProps) {
   } catch (error) {
     if (error instanceof ApiRequestError) {
       if (error.status === 401) {
-        return <AuthWall currentPath={currentPath} />;
+        return (
+          <AuthWall
+            currentPath={currentPath}
+            owner={owner}
+            pullNumber={pullNumber}
+            repo={repo}
+            snapshotIndex={snapshotIndex}
+          />
+        );
       }
 
       if (error.status === 404) {
@@ -50,28 +58,49 @@ export async function ReviewRoute(props: ReviewRouteProps) {
 }
 
 
-function AuthWall({ currentPath }: { currentPath: string }) {
+type AuthWallProps = {
+  currentPath: string;
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  snapshotIndex?: number;
+};
+
+
+function AuthWall({
+  currentPath,
+  owner,
+  pullNumber,
+  repo,
+  snapshotIndex,
+}: AuthWallProps) {
+  const reviewIdentity = `${owner}/${repo} · PR #${pullNumber}`;
+  const reviewContext =
+    snapshotIndex === undefined
+      ? reviewIdentity
+      : `${reviewIdentity} · Push ${snapshotIndex}`;
+
   return (
     <main className="center-stage">
       <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">GitHub sign-in</p>
-        <h1>Sign in with GitHub to open this pull request review</h1>
+        <p className="eyebrow">Review access</p>
+        <h1>{reviewContext}</h1>
         <p className="hero-summary">
-          NotebookLens checks your GitHub access before it shows notebook changes,
-          outputs, and review threads for this pull request.
+          Sign in with GitHub so NotebookLens can confirm your access to this pull
+          request review and bring you back to the same workspace page.
         </p>
         <ul className="wall-list">
+          <li>Use the GitHub account that can already open {owner}/{repo}.</li>
           <li>Make sure the NotebookLens GitHub App is installed on this repository.</li>
-          <li>Open this page from the `NotebookLens Review Workspace` check run when possible.</li>
-          <li>Use the same GitHub account that can already view the pull request.</li>
+          <li>Reopen the `NotebookLens Review Workspace` check run when you want the fastest path back here.</li>
         </ul>
         <p className="muted-copy">
-          If you just installed the app or signed in, GitHub may take a moment to send
-          you back to the right review page.
+          After sign-in, NotebookLens continues directly to this review instead of
+          sending you to a generic landing page.
         </p>
         <div className="wall-actions">
           <a className="primary-button" href={buildLoginHref(currentPath)}>
-            Continue with GitHub
+            Continue to {reviewContext}
           </a>
           <Link className="secondary-button" href="/">
             Back to home
