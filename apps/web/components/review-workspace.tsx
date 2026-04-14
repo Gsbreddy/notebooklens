@@ -745,18 +745,10 @@ function ThreadColumn({
   composerId,
   onCancelComposer,
 }: ThreadColumnProps) {
+  const showThreadingNote = !threadable && threads.length === 0;
+
   return (
     <div className="thread-column">
-      <div className="thread-column-head">
-        <h5>Inline threads</h5>
-        {threads.length ? (
-          <StatusPill
-            label={`${threads.length} active`}
-            tone={threads.some((thread) => thread.status === "open") ? "accent" : "default"}
-          />
-        ) : null}
-      </div>
-
       {threadable && composerOpen ? (
         <InlineThreadComposer
           anchor={anchor}
@@ -768,7 +760,7 @@ function ThreadColumn({
         />
       ) : null}
 
-      {!threadable ? (
+      {showThreadingNote ? (
         <p className="muted-copy">
           New threads can only start on changed areas in the latest ready snapshot.
         </p>
@@ -780,9 +772,7 @@ function ThreadColumn({
             <ThreadCard currentPath={currentPath} key={thread.id} thread={thread} />
           ))}
         </div>
-      ) : (
-        <p className="muted-copy">No discussion on this block yet.</p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -861,46 +851,56 @@ function ThreadCard({
 }) {
   const mirrorStatus = summarizeGitHubMirrorStatus(thread);
   const authorLabel = thread.messages[0]?.author_login ?? "NotebookLens reviewer";
+  const previewText = summarizeThreadPreview(thread);
+  const messageCount = thread.messages.length;
 
   return (
-    <article className="thread-card thread-card-flat">
-      <div className="thread-head">
-        <div className="thread-heading-copy">
-          <strong>{authorLabel}</strong>
-          <span className="muted-copy">Started {formatTimestamp(thread.created_at)}</span>
-        </div>
-        <div className="thread-head-pills">
-          <StatusPill label={thread.status} tone={threadTone(thread.status)} />
-          {thread.carried_forward ? <StatusPill label="continued here" tone="accent" /> : null}
-        </div>
-      </div>
-
-      <section className="mirror-card mirror-card-inline">
-        <div className="mirror-head">
-          <div>
-            <h6>{mirrorStatus.label}</h6>
+    <details className="thread-card thread-card-flat thread-details">
+      <summary className="thread-summary">
+        <div className="thread-summary-main">
+          <div className="thread-heading-copy">
+            <strong>{authorLabel}</strong>
+            <p className="thread-preview">{previewText}</p>
           </div>
-          <StatusPill label={mirrorStatus.label} tone={mirrorStatus.tone} />
+          <div className="thread-head-pills">
+            <StatusPill label={thread.status} tone={threadTone(thread.status)} />
+            {thread.carried_forward ? <StatusPill label="continued here" tone="accent" /> : null}
+          </div>
         </div>
-        <p className="muted-copy">{mirrorStatus.description}</p>
-        <div className="mirror-links">
-          {thread.github_root_comment_url && mirrorStatus.linkLabel ? (
-            <a
-              className="text-link"
-              href={thread.github_root_comment_url}
-              rel="noreferrer"
-              target="_blank"
-            >
-              {mirrorStatus.linkLabel}
-            </a>
-          ) : null}
-          {thread.github_last_mirrored_at ? (
-            <span className="muted-copy">
-              Last update {formatTimestamp(thread.github_last_mirrored_at)}
-            </span>
-          ) : null}
+        <div className="thread-secondary-row">
+          <span className="muted-copy">
+            Started {formatTimestamp(thread.created_at)} · {messageCount} message{messageCount === 1 ? "" : "s"}
+          </span>
+          <span className="muted-copy thread-mirror-note" title={mirrorStatus.description}>
+            GitHub: {mirrorStatus.label}
+          </span>
         </div>
-      </section>
+      </summary>
+
+      {(thread.github_root_comment_url || thread.github_last_mirrored_at) ? (
+        <div className="thread-secondary-row thread-secondary-row-expanded">
+          <span className="muted-copy thread-mirror-note" title={mirrorStatus.description}>
+            GitHub: {mirrorStatus.label}
+          </span>
+          <div className="thread-secondary-links">
+            {thread.github_root_comment_url && mirrorStatus.linkLabel ? (
+              <a
+                className="text-link"
+                href={thread.github_root_comment_url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {mirrorStatus.linkLabel}
+              </a>
+            ) : null}
+            {thread.github_last_mirrored_at ? (
+              <span className="muted-copy">
+                Last update {formatTimestamp(thread.github_last_mirrored_at)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="message-stack">
         {thread.messages.map((message) => (
@@ -969,8 +969,23 @@ function ThreadCard({
           </form>
         )}
       </div>
-    </article>
+    </details>
   );
+}
+
+
+function summarizeThreadPreview(thread: ReviewThread): string {
+  const body = thread.messages[0]?.body_markdown?.replace(/\s+/g, " ").trim();
+
+  if (!body) {
+    return "Open the thread for the full discussion.";
+  }
+
+  if (body.length <= 110) {
+    return body;
+  }
+
+  return `${body.slice(0, 107).trimEnd()}...`;
 }
 
 

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ReviewWorkspace } from "../components/review-workspace";
-import type { RenderRow, SnapshotNotebook, WorkspacePayload } from "./types";
+import type { RenderRow, ReviewThread, SnapshotNotebook, WorkspacePayload } from "./types";
 
 
 vi.stubGlobal("React", React);
@@ -226,6 +226,42 @@ function buildWorkspace(row: RenderRow): WorkspacePayload {
 }
 
 
+function buildThread(
+  row: RenderRow,
+  overrides: Partial<ReviewThread> = {},
+): ReviewThread {
+  return {
+    id: "thread-id",
+    managed_review_id: "review-id",
+    origin_snapshot_id: "snapshot-1",
+    current_snapshot_id: "snapshot-2",
+    anchor: row.thread_anchors.outputs,
+    status: "open",
+    carried_forward: true,
+    created_by_github_user_id: 101,
+    created_at: "2026-04-12T12:00:00Z",
+    updated_at: "2026-04-12T12:00:00Z",
+    resolved_at: null,
+    resolved_by_github_user_id: null,
+    github_mirror_state: "pending",
+    github_root_comment_url: null,
+    github_last_mirrored_at: null,
+    messages: [
+      {
+        id: "message-1",
+        author_github_user_id: 101,
+        author_login: "octo-reviewer",
+        body_markdown: "Please explain why the validation accuracy regressed on this output.",
+        created_at: "2026-04-12T12:00:00Z",
+        github_reply_comment_id: null,
+        github_reply_comment_url: null,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+
 function renderWorkspacePayload(workspace: WorkspacePayload): string {
   return renderToStaticMarkup(
     React.createElement(ReviewWorkspace, {
@@ -352,5 +388,41 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Jump between notebooks");
     expect(markup).toContain("2 changed notebooks");
     expect(markup).toContain("Two notebooks changed in this review version.");
+  });
+
+  it("renders existing threads as collapsed summaries with compact GitHub metadata", () => {
+    const row = buildRow({
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder",
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified",
+          },
+        ],
+      },
+    });
+    const workspace = buildWorkspace(row);
+    workspace.threads = [
+      buildThread(row, {
+        github_mirror_state: "mirrored",
+        github_root_comment_url: "https://github.example/thread/1",
+        github_last_mirrored_at: "2026-04-12T13:30:00Z",
+      }),
+    ];
+
+    const markup = renderWorkspacePayload(workspace);
+
+    expect(markup).toContain("Add comment");
+    expect(markup).not.toContain('class="thread-column-head"');
+    expect(markup).toContain("Please explain why the validation accuracy regressed on this output.");
+    expect(markup).toContain("GitHub: Mirrored to GitHub");
+    expect(markup).toContain("Open mirrored PR thread");
+    expect(markup).toContain('class="thread-card thread-card-flat thread-details"');
+    expect(markup).not.toContain('thread-card thread-card-flat thread-details" open');
   });
 });

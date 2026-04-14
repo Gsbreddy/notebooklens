@@ -935,18 +935,15 @@ pre {
   border-top: 1px solid rgba(36, 39, 45, 0.08);
 }
 
-.thread-column-head {
-  align-items: center;
-}
-
-.thread-column-head h5 {
-  font-size: 1.02rem;
-  margin: 0;
-}
-
 .thread-heading-copy {
   display: grid;
   gap: 4px;
+}
+
+.thread-preview {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.5;
 }
 
 .thread-head-pills {
@@ -1076,30 +1073,55 @@ pre {
   box-shadow: none;
 }
 
-.mirror-card {
+.thread-details {
+  display: grid;
+  gap: 12px;
+}
+
+.thread-summary {
   display: grid;
   gap: 10px;
-  margin-top: 12px;
+  cursor: pointer;
+  list-style: none;
 }
 
-.mirror-head h6 {
-  margin: 0;
-  font-size: 1rem;
+.thread-summary::-webkit-details-marker {
+  display: none;
 }
 
-.mirror-card-inline {
-  gap: 8px;
-  padding: 10px 12px;
-  background: rgba(31, 37, 45, 0.03);
-  border-style: dashed;
-}
-
-.mirror-card-inline .mirror-head {
+.thread-summary-main,
+.thread-secondary-row,
+.thread-secondary-links {
+  display: flex;
+  gap: 10px 12px;
+  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
 }
 
-.mirror-card-inline .mirror-head h6 {
-  font-size: 0.95rem;
+.thread-summary-main {
+  align-items: flex-start;
+}
+
+.thread-secondary-row {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.thread-secondary-row-expanded {
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(31, 37, 45, 0.04);
+}
+
+.thread-mirror-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thread-details[open] > .thread-summary {
+  padding-bottom: 2px;
 }
 
 .text-link {
