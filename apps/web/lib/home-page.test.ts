@@ -64,12 +64,17 @@ describe("HomePage", () => {
     );
   });
 
-  it("marks the reviewer proof panel as an illustration instead of a live thread surface", async () => {
+  it("marks the reviewer proof panel as an anchored illustration instead of a detached example thread", async () => {
     const html = await renderHomePage();
 
     expect(html).toContain("Illustration only");
     expect(html).toContain("Static preview of the latest notebook review workspace");
-    expect(html).toContain("Example inline comment");
-    expect(html).not.toContain("Open thread");
+    expect(html).toContain("Changed output");
+    expect(html).toContain("thread anchored here");
+    expect(html).toContain("Open thread");
+    expect(html).toContain(
+      "Attached directly to this changed output before replying on the pull request.",
+    );
+    expect(html).not.toContain("Example inline comment");
   });
 });

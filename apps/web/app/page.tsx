@@ -190,11 +190,53 @@ export default async function HomePage({ searchParams }: PageProps) {
                   <li>Inline comments stay anchored to the exact changed block.</li>
                 </ul>
 
-                <div className="landing-proof-thread">
-                  <span className="summary-label">Example inline comment</span>
-                  <strong>
-                    Explain whether the widened confidence band is expected.
-                  </strong>
+                <div className="landing-proof-anchor-demo">
+                  <div className="landing-proof-output-card">
+                    <div className="landing-proof-output-head">
+                      <div>
+                        <span className="summary-label">Changed output</span>
+                        <strong>Cell 14 · forecast confidence band</strong>
+                      </div>
+                      <span className="landing-proof-anchor-tag">
+                        thread anchored here
+                      </span>
+                    </div>
+                    <div className="landing-proof-output-block">
+                      <div
+                        aria-hidden="true"
+                        className="landing-proof-output-visual"
+                      >
+                        <span className="landing-proof-output-axis" />
+                        <span className="landing-proof-output-band landing-proof-output-band-baseline" />
+                        <span className="landing-proof-output-band landing-proof-output-band-current" />
+                        <span className="landing-proof-output-line landing-proof-output-line-baseline" />
+                        <span className="landing-proof-output-line landing-proof-output-line-current" />
+                        <span className="landing-proof-output-anchor-marker">
+                          anchor
+                        </span>
+                      </div>
+                      <p className="landing-proof-output-copy">
+                        The latest push widens the rendered confidence band, so
+                        the review opens on the exact output block under
+                        discussion.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div aria-hidden="true" className="landing-proof-anchor-rail">
+                    <span className="landing-proof-anchor-dot" />
+                  </div>
+
+                  <div className="landing-proof-thread">
+                    <span className="summary-label">Open thread</span>
+                    <strong>
+                      Explain whether the widened confidence band is expected.
+                    </strong>
+                    <p className="landing-proof-thread-copy">
+                      Attached directly to this changed output before replying
+                      on the pull request.
+                    </p>
+                  </div>
                 </div>
               </div>
             </figure>
