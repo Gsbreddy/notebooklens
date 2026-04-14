@@ -63,27 +63,19 @@ export function ReviewWorkspace({
 
   return (
     <div className="workspace-shell">
-      <header className="hero-card">
-        <div className="hero-copy">
-          <p className="eyebrow">NotebookLens Review Workspace</p>
+      <header className="hero-card workspace-header">
+        <div className="hero-copy workspace-header-copy">
           <p className="workspace-breadcrumb">
             {workspace.review.installation.account_login} / {workspace.review.owner} / {workspace.review.repo}
           </p>
-          <h1>
+          <h1 className="workspace-title">
             {workspace.review.owner}/{workspace.review.repo} PR #
             {workspace.review.pull_number}
           </h1>
-          <p className="hero-summary">
-            Review the latest normalized notebook snapshot, switch across prior
-            revisions, and keep discussion anchored to specific changed notebook
-            blocks.
+          <p className="hero-summary workspace-lead">
+            Latest notebook-aware diff with snapshot history and inline discussion.
           </p>
-          <p className="hero-subsummary">
-            Beta workspace features are live here first. Use this surface to read
-            notebook-aware diffs, track carried-forward discussion, and confirm what
-            NotebookLens mirrored back to GitHub.
-          </p>
-          <div className="hero-meta">
+          <div className="hero-meta workspace-meta">
             <StatusPill label={`Review ${workspace.review.status}`} tone="default" />
             <StatusPill label={latestSnapshotLabel} tone="default" />
             <StatusPill
@@ -100,7 +92,7 @@ export function ReviewWorkspace({
             />
           </div>
         </div>
-        <div className="hero-actions">
+        <div className="hero-actions workspace-header-actions">
           <Link
             className="secondary-button"
             href={
@@ -286,43 +278,43 @@ type SnapshotOverviewProps = {
 
 function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
   return (
-    <section className="summary-card">
-      <div className="summary-head">
+    <section className="summary-card snapshot-overview-card">
+      <div className="summary-head snapshot-overview-head">
         <div>
-          <p className="eyebrow">Selected Snapshot</p>
-          <h2>Snapshot {snapshot.snapshot_index}</h2>
+          <p className="eyebrow">Snapshot {snapshot.snapshot_index}</p>
+          <h2 className="snapshot-overview-title">Ready to review</h2>
         </div>
         <StatusPill label={snapshot.status} tone={snapshot.status === "failed" ? "danger" : "default"} />
       </div>
-      <div className="snapshot-strip">
-        <span>Selected from PR #{review.pull_number}</span>
+      <div className="snapshot-strip snapshot-context-strip">
         <span>Created {formatTimestamp(snapshot.created_at)}</span>
+        <span>
+          {review.base_branch} · {snapshot.base_sha.slice(0, 12)} {"->"} {snapshot.head_sha.slice(0, 12)}
+        </span>
+        <span>{snapshot.notebook_count} notebook{snapshot.notebook_count === 1 ? "" : "s"}</span>
+        <span>{snapshot.changed_cell_count} changed cell{snapshot.changed_cell_count === 1 ? "" : "s"}</span>
       </div>
-      <div className="summary-grid">
-        <div className="summary-metric">
-          <span className="summary-label">Base branch</span>
+      {snapshot.summary_text ? (
+        <p className="summary-text snapshot-summary-text">{snapshot.summary_text}</p>
+      ) : null}
+      <div className="snapshot-overview-stats">
+        <div className="summary-metric snapshot-metric">
+          <span className="summary-label">PR</span>
+          <strong>#{review.pull_number}</strong>
+        </div>
+        <div className="summary-metric snapshot-metric">
+          <span className="summary-label">Base</span>
           <strong>{review.base_branch}</strong>
         </div>
-        <div className="summary-metric">
-          <span className="summary-label">Base SHA</span>
-          <strong>{snapshot.base_sha.slice(0, 12)}</strong>
-        </div>
-        <div className="summary-metric">
+        <div className="summary-metric snapshot-metric">
           <span className="summary-label">Head SHA</span>
           <strong>{snapshot.head_sha.slice(0, 12)}</strong>
         </div>
-        <div className="summary-metric">
-          <span className="summary-label">Notebooks</span>
-          <strong>{snapshot.notebook_count}</strong>
-        </div>
-        <div className="summary-metric">
-          <span className="summary-label">Changed cells</span>
-          <strong>{snapshot.changed_cell_count}</strong>
+        <div className="summary-metric snapshot-metric">
+          <span className="summary-label">Open threads</span>
+          <strong>{review.thread_counts.unresolved}</strong>
         </div>
       </div>
-      {snapshot.summary_text ? (
-        <p className="summary-text">{snapshot.summary_text}</p>
-      ) : null}
     </section>
   );
 }
