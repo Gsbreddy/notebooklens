@@ -1,4 +1,4 @@
-import { buildLoginHref } from "@/lib/api";
+import { buildLoginHref } from "@/lib/public-hrefs";
 
 const WORKSPACE_QUICKSTART_URL =
   "https://notebooklens.github.io/notebooklens/quickstart-workspace/";
