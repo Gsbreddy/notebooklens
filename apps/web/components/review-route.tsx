@@ -66,6 +66,10 @@ function AuthWall({ currentPath }: { currentPath: string }) {
           <li>Open the review route from a GitHub check run when possible.</li>
           <li>Use the same GitHub account that can already view the pull request.</li>
         </ul>
+        <p className="muted-copy">
+          If you just completed installation, GitHub may take a moment to redirect you
+          back into the correct review route.
+        </p>
         <div className="wall-actions">
           <a className="primary-button" href={buildLoginHref(currentPath)}>
             Continue with GitHub
@@ -92,6 +96,10 @@ function ErrorWall({ detail }: { detail: string }) {
           <li>Make sure your GitHub session still has access to the repository.</li>
           <li>Retry from the pull request after refreshing your NotebookLens access.</li>
         </ul>
+        <p className="muted-copy">
+          NotebookLens keeps the PR check run as the canonical entry point, so reopening
+          the check run is usually the fastest way back to a healthy review route.
+        </p>
         <div className="wall-actions">
           <Link className="secondary-button" href="/">
             Return home

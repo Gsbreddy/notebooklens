@@ -105,6 +105,11 @@ pre {
   gap: 18px;
 }
 
+.workspace-sidebar {
+  position: sticky;
+  top: 20px;
+}
+
 .hero-card,
 .summary-card,
 .side-card,
@@ -243,6 +248,10 @@ pre {
   min-height: 100%;
 }
 
+.landing-card-wide {
+  grid-column: 1 / -1;
+}
+
 .landing-list {
   margin: 0;
   padding-left: 1.1rem;
@@ -253,6 +262,10 @@ pre {
 .landing-feature-stack {
   display: grid;
   gap: 14px;
+}
+
+.two-column-feature-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .landing-feature {
@@ -287,6 +300,15 @@ pre {
 
 .summary-grid {
   margin-top: 20px;
+}
+
+.snapshot-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .summary-metric {
@@ -441,6 +463,26 @@ pre {
   background: linear-gradient(180deg, rgba(247, 217, 197, 0.62), rgba(255, 253, 248, 0.95));
 }
 
+.notebook-subpath {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.notebook-stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.notebook-stat {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+}
+
 .chip-list,
 .text-list {
   margin: 0;
@@ -481,6 +523,18 @@ pre {
 .output-head {
   justify-content: space-between;
   align-items: flex-start;
+}
+
+.cell-card-meta {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  max-width: 36ch;
+}
+
+.cell-card-meta .cell-summary {
+  margin: 0;
+  text-align: right;
 }
 
 .context-strip {
@@ -565,6 +619,18 @@ pre {
 
 .thread-column-head h5 {
   font-size: 1.02rem;
+}
+
+.thread-heading-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.thread-head-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .thread-form {
@@ -710,11 +776,20 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .workspace-sidebar {
+    position: static;
+  }
+
   .hero-card {
     flex-direction: column;
   }
 
   .landing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .two-column-feature-stack,
+  .notebook-stats {
     grid-template-columns: 1fr;
   }
 }
@@ -742,6 +817,15 @@ pre {
 
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cell-card-meta {
+    justify-items: start;
+    max-width: 100%;
+  }
+
+  .cell-card-meta .cell-summary {
+    text-align: left;
   }
 
   .wall-actions,

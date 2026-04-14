@@ -12,6 +12,11 @@ export default function HomePage() {
             review workspace with snapshot history, image-aware diffs, reviewer
             guidance, and inline discussion threads.
           </p>
+          <p className="hero-subsummary">
+            If ReviewNB feels seamless, this page should too: install the app, open
+            a pull request with notebook changes, and jump into one review route
+            instead of piecing context together from raw JSON diffs.
+          </p>
           <div className="hero-meta">
             <span className="status-pill tone-accent">Managed workspace beta</span>
             <span className="status-pill tone-default">Built for DS and ML teams</span>
@@ -81,6 +86,27 @@ export default function HomePage() {
               <strong>Inline review threads</strong>
               <p className="muted-copy">
                 Keep questions and decisions attached to the exact changed block.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <article className="summary-card landing-card landing-card-wide">
+          <p className="eyebrow">Why Teams Use It</p>
+          <h2>Notebook review without losing the PR workflow</h2>
+          <div className="landing-feature-stack two-column-feature-stack">
+            <div className="landing-feature">
+              <strong>Stay anchored to GitHub</strong>
+              <p className="muted-copy">
+                Reviews still start from a pull request check run, so DS/ML teams keep
+                the same repo workflow they already use.
+              </p>
+            </div>
+            <div className="landing-feature">
+              <strong>See notebook-specific context</strong>
+              <p className="muted-copy">
+                Snapshot history, changed outputs, and inline threads stay attached to
+                the notebook blocks that actually changed.
               </p>
             </div>
           </div>

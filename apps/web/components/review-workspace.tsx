@@ -45,12 +45,19 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const snapshot = workspace.snapshot;
   const threadsByAnchor = groupThreadsByAnchor(workspace.threads);
+  const latestSnapshotLabel =
+    workspace.review.latest_snapshot_index === null
+      ? "No snapshot"
+      : `Latest snapshot ${workspace.review.latest_snapshot_index}`;
 
   return (
     <div className="workspace-shell">
       <header className="hero-card">
         <div className="hero-copy">
           <p className="eyebrow">NotebookLens Review Workspace</p>
+          <p className="workspace-breadcrumb">
+            {workspace.review.installation.account_login} / {workspace.review.owner} / {workspace.review.repo}
+          </p>
           <h1>
             {workspace.review.owner}/{workspace.review.repo} PR #
             {workspace.review.pull_number}
@@ -67,6 +74,7 @@ export function ReviewWorkspace({
           </p>
           <div className="hero-meta">
             <StatusPill label={`Review ${workspace.review.status}`} tone="default" />
+            <StatusPill label={latestSnapshotLabel} tone="default" />
             <StatusPill
               label={`${workspace.review.thread_counts.unresolved} open`}
               tone="accent"
@@ -275,6 +283,10 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
         </div>
         <StatusPill label={snapshot.status} tone={snapshot.status === "failed" ? "danger" : "default"} />
       </div>
+      <div className="snapshot-strip">
+        <span>Selected from PR #{review.pull_number}</span>
+        <span>Created {formatTimestamp(snapshot.created_at)}</span>
+      </div>
       <div className="summary-grid">
         <div className="summary-metric">
           <span className="summary-label">Base branch</span>
@@ -323,14 +335,33 @@ function NotebookCard({
   threadsByAnchor,
   currentPath,
 }: NotebookCardProps) {
+  const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
+  const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
+
   return (
     <section className="notebook-card">
       <div className="notebook-head">
         <div>
           <p className="eyebrow">Notebook Diff</p>
-          <h2>{notebook.path}</h2>
+          <h2>{fileLabel}</h2>
+          <p className="notebook-subpath">{directoryLabel}</p>
         </div>
         <StatusPill label={notebook.change_type} tone="default" />
+      </div>
+
+      <div className="notebook-stats">
+        <div className="notebook-stat">
+          <span className="summary-label">Changed rows</span>
+          <strong>{notebook.render_rows.length}</strong>
+        </div>
+        <div className="notebook-stat">
+          <span className="summary-label">Inline threads</span>
+          <strong>{threadCount}</strong>
+        </div>
+        <div className="notebook-stat">
+          <span className="summary-label">Snapshot</span>
+          <strong>{snapshot.snapshot_index}</strong>
+        </div>
       </div>
 
       {notebook.notices.length ? (
@@ -387,6 +418,7 @@ function CellRowCard({
       isBlockChanged(row, blockKind as SnapshotBlockKind) ||
       (threadsByAnchor.get(buildAnchorKey(row.thread_anchors[blockKind as SnapshotBlockKind]))?.length ?? 0) > 0,
   ) as SnapshotBlockKind[];
+  const changedBlockCount = blocks.filter((blockKind) => isBlockChanged(row, blockKind)).length;
 
   return (
     <article className="cell-card">
@@ -397,7 +429,13 @@ function CellRowCard({
             {row.cell_type} cell · {row.change_type}
           </h3>
         </div>
-        <p className="cell-summary">{row.summary}</p>
+        <div className="cell-card-meta">
+          <StatusPill
+            label={`${changedBlockCount} changed block${changedBlockCount === 1 ? "" : "s"}`}
+            tone="default"
+          />
+          <p className="cell-summary">{row.summary}</p>
+        </div>
       </div>
 
       {row.review_context.length ? (
@@ -420,7 +458,7 @@ function CellRowCard({
             <section className="diff-block" key={blockKind}>
               <div className="diff-block-head">
                 <div>
-                  <p className="eyebrow">Inline Discussion</p>
+                  <p className="eyebrow">Review Block</p>
                   <h4>{blockTitle(blockKind)}</h4>
                 </div>
                 <div className="diff-block-meta">
@@ -645,12 +683,19 @@ function ThreadCard({
   currentPath: string;
 }) {
   const mirrorStatus = summarizeGitHubMirrorStatus(thread);
+  const authorLabel = thread.messages[0]?.author_login ?? "NotebookLens reviewer";
 
   return (
     <article className="thread-card">
       <div className="thread-head">
-        <StatusPill label={thread.status} tone={threadTone(thread.status)} />
-        {thread.carried_forward ? <StatusPill label="carried forward" tone="accent" /> : null}
+        <div className="thread-heading-copy">
+          <strong>{authorLabel}</strong>
+          <span className="muted-copy">Started {formatTimestamp(thread.created_at)}</span>
+        </div>
+        <div className="thread-head-pills">
+          <StatusPill label={thread.status} tone={threadTone(thread.status)} />
+          {thread.carried_forward ? <StatusPill label="carried forward" tone="accent" /> : null}
+        </div>
       </div>
 
       <section className="mirror-card">
@@ -816,4 +861,31 @@ function outputChangeTone(
     return "warning";
   }
   return "default";
+}
+
+
+function splitNotebookPath(path: string): [string, string] {
+  const parts = path.split("/");
+  const fileLabel = parts.pop() ?? path;
+  const directoryLabel = parts.length ? parts.join(" / ") : "Repository root";
+  return [directoryLabel, fileLabel];
+}
+
+
+function countThreadsForNotebook(
+  notebook: SnapshotNotebook,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): number {
+  const seen = new Set<string>();
+
+  for (const row of notebook.render_rows) {
+    for (const anchor of Object.values(row.thread_anchors)) {
+      const threads = threadsByAnchor.get(buildAnchorKey(anchor)) ?? [];
+      for (const thread of threads) {
+        seen.add(thread.id);
+      }
+    }
+  }
+
+  return seen.size;
 }
