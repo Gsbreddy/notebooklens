@@ -637,12 +637,13 @@ function ThreadColumn({
   return (
     <div className="thread-column">
       <div className="thread-column-head">
-        <div>
-          <h5>Inline threads</h5>
-          <p className="muted-copy">
-            Keep questions and decisions attached to this part of the review.
-          </p>
-        </div>
+        <h5>Inline threads</h5>
+        {threads.length ? (
+          <StatusPill
+            label={`${threads.length} active`}
+            tone={threads.some((thread) => thread.status === "open") ? "accent" : "default"}
+          />
+        ) : null}
       </div>
 
       {threadable ? (
@@ -655,19 +656,18 @@ function ThreadColumn({
           <input name="reviewId" type="hidden" value={reviewId} />
           <input name="snapshotId" type="hidden" value={snapshotId} />
           <input name="anchorJson" type="hidden" value={JSON.stringify(anchor)} />
-          <label className="thread-form-compact-label">
-            <span>Start a thread</span>
-            <textarea
-              name="bodyMarkdown"
-              placeholder="Ask for context, call out a regression, or note the follow-up you want here."
-              required
-              rows={3}
-            />
-          </label>
+          <div className="thread-form-inline-head">
+            <strong>Start a thread</strong>
+            <span className="muted-copy">Keep it attached to this block.</span>
+          </div>
+          <textarea
+            name="bodyMarkdown"
+            placeholder="Ask for context, call out a regression, or note the follow-up you want here."
+            required
+            rows={3}
+          />
           <div className="thread-form-actions">
-            <p className="muted-copy">
-              NotebookLens keeps this discussion tied to the same review area as later pushes arrive, when possible.
-            </p>
+            <span className="muted-copy">Posts to this review block.</span>
             <button className="primary-button" type="submit">
               Create thread
             </button>
@@ -675,7 +675,7 @@ function ThreadColumn({
         </form>
       ) : (
         <p className="muted-copy">
-          New threads can only be started on changed areas in the latest ready PR version.
+          New threads can only start on changed areas in the latest ready snapshot.
         </p>
       )}
 
@@ -686,7 +686,7 @@ function ThreadColumn({
           ))}
         </div>
       ) : (
-        <p className="muted-copy">No threads are attached to this block yet.</p>
+        <p className="muted-copy">No discussion on this block yet.</p>
       )}
     </div>
   );
@@ -770,21 +770,26 @@ function ThreadCard({
 
       <div className="thread-actions">
         <details className="reply-details">
-          <summary>Reply</summary>
+          <summary>Quick reply</summary>
           <form
             action={buildWorkspaceActionPath("reply-thread")}
-            className="thread-form"
+            className="thread-form thread-form-reply"
             method="post"
           >
             <input name="returnTo" type="hidden" value={currentPath} />
             <input name="threadId" type="hidden" value={thread.id} />
-            <label>
-              Message
-              <textarea name="bodyMarkdown" required rows={3} />
-            </label>
-            <button className="primary-button" type="submit">
-              Add reply
-            </button>
+            <textarea
+              name="bodyMarkdown"
+              placeholder="Add context or answer the open question."
+              required
+              rows={3}
+            />
+            <div className="thread-form-actions">
+              <span className="muted-copy">Reply in place.</span>
+              <button className="primary-button" type="submit">
+                Add reply
+              </button>
+            </div>
           </form>
         </details>
 

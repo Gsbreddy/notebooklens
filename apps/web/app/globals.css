@@ -675,18 +675,19 @@ pre {
 
 .thread-column {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
 }
 
-.thread-column-head h5 {
-  font-size: 1.02rem;
+.thread-column-head {
+  align-items: center;
 }
 
-.thread-column-head p {
-  margin: 8px 0 0;
+.thread-column-head h5 {
+  font-size: 1.02rem;
+  margin: 0;
 }
 
 .thread-heading-copy {
@@ -704,12 +705,6 @@ pre {
 .thread-form {
   display: grid;
   gap: 12px;
-}
-
-.thread-form label {
-  display: grid;
-  gap: 8px;
-  font-weight: 700;
 }
 
 .thread-form textarea,
@@ -731,24 +726,28 @@ pre {
 
 .thread-form-inline {
   gap: 10px;
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 217, 197, 0.28));
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 217, 197, 0.22));
 }
 
 .thread-form-inline textarea {
-  min-height: 88px;
+  min-height: 84px;
   background: rgba(255, 255, 255, 0.9);
 }
 
-.thread-form-compact-label > span {
-  font-size: 0.92rem;
+.thread-form-inline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .thread-form-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -756,7 +755,12 @@ pre {
 
 .thread-form-actions .muted-copy {
   margin: 0;
-  flex: 1 1 280px;
+  flex: 1 1 180px;
+}
+
+.thread-form-reply {
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .thread-composer summary,

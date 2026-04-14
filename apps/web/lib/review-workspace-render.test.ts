@@ -189,7 +189,7 @@ describe("review workspace rendering", () => {
     expect(markup).not.toContain("Output summary diff");
     expect(markup).not.toContain("Metadata diff");
     expect(markup).not.toContain("Metric output changed.");
-    expect(markup).toContain("No notebook diffs in this snapshot");
+    expect(markup).toContain("No reviewable notebook changes on this version");
   });
 
   it("skips empty output cards inside an otherwise meaningful output block", () => {
@@ -219,7 +219,7 @@ describe("review workspace rendering", () => {
       }),
     );
 
-    expect(markup).toContain("Output summary diff");
+    expect(markup).toContain("Output changes");
     expect(markup).toContain("Accuracy dropped from 0.92 to 0.88.");
     expect(markup).not.toContain("execute_result");
   });
