@@ -403,6 +403,36 @@ pre {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.notebook-jump-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.notebook-jump-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.notebook-jump-link {
+  align-items: center;
+  border-color: rgba(36, 39, 45, 0.08);
+}
+
+.notebook-jump-copy,
+.notebook-jump-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.notebook-jump-meta {
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
 .summary-metric {
   min-width: 140px;
   padding: 14px 16px;
@@ -1024,6 +1054,10 @@ pre {
   .two-column-feature-stack,
   .notebook-stats,
   .snapshot-overview-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .notebook-jump-grid {
     grid-template-columns: 1fr;
   }
 }

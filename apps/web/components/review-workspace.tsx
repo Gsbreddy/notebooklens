@@ -130,6 +130,45 @@ export function ReviewWorkspace({
           {snapshot?.status === "ready" &&
           visibleNotebooks.length > 0 ? (
             <section className="notebook-stack">
+              {visibleNotebooks.length > 1 ? (
+                <section className="summary-card notebook-jump-card">
+                  <div className="summary-head">
+                    <div>
+                      <p className="eyebrow">Notebook navigator</p>
+                      <h2>Jump to the next notebook</h2>
+                    </div>
+                    <span className="muted-copy">
+                      {visibleNotebooks.length} changed notebooks
+                    </span>
+                  </div>
+                  <div className="notebook-jump-grid">
+                    {visibleNotebooks.map((notebook) => {
+                      const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
+                      const reviewItemCount = notebook.render_rows.filter((row) =>
+                        hasVisibleBlocks(row, threadsByAnchor),
+                      ).length;
+                      const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
+
+                      return (
+                        <a
+                          className="history-link notebook-jump-link"
+                          href={`#${buildNotebookSectionId(notebook.path)}`}
+                          key={`jump-${notebook.path}`}
+                        >
+                          <span className="notebook-jump-copy">
+                            <strong>{fileLabel}</strong>
+                            <span className="history-caption">{directoryLabel}</span>
+                          </span>
+                          <span className="notebook-jump-meta">
+                            <span>{reviewItemCount} items</span>
+                            <span>{threadCount} threads</span>
+                          </span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
               {visibleNotebooks.map((notebook) => (
                 <NotebookCard
                   currentPath={currentPath}
@@ -373,9 +412,10 @@ function NotebookCard({
   const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
   const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
   const visibleRows = notebook.render_rows.filter((row) => hasVisibleBlocks(row, threadsByAnchor));
+  const notebookSectionId = buildNotebookSectionId(notebook.path);
 
   return (
-    <section className="notebook-card notebook-card-flat">
+    <section className="notebook-card notebook-card-flat" id={notebookSectionId}>
       <div className="notebook-head">
         <div>
           <h2>{fileLabel}</h2>
@@ -990,4 +1030,12 @@ function countThreadsForNotebook(
   }
 
   return seen.size;
+}
+
+
+function buildNotebookSectionId(path: string): string {
+  return `notebook-${path
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}`;
 }
