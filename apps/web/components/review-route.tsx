@@ -54,21 +54,20 @@ function AuthWall({ currentPath }: { currentPath: string }) {
   return (
     <main className="center-stage">
       <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">Managed Review Access</p>
-        <h1>Sign in with GitHub to open this review workspace</h1>
+        <p className="eyebrow">Review access</p>
+        <h1>Sign in with GitHub to open this pull request review</h1>
         <p className="hero-summary">
-          NotebookLens checks repository visibility with your GitHub OAuth
-          session before it loads snapshot history, rendered outputs, or inline
-          discussion threads.
+          NotebookLens checks your GitHub access before it shows notebook changes,
+          outputs, and review threads for this pull request.
         </p>
         <ul className="wall-list">
           <li>Make sure the NotebookLens GitHub App is installed on this repository.</li>
-          <li>Open the review route from a GitHub check run when possible.</li>
+          <li>Open this page from the `NotebookLens Review Workspace` check run when possible.</li>
           <li>Use the same GitHub account that can already view the pull request.</li>
         </ul>
         <p className="muted-copy">
-          If you just completed installation, GitHub may take a moment to redirect you
-          back into the correct review route.
+          If you just installed the app or signed in, GitHub may take a moment to send
+          you back to the right review page.
         </p>
         <div className="wall-actions">
           <a className="primary-button" href={buildLoginHref(currentPath)}>
@@ -88,17 +87,17 @@ function ErrorWall({ detail }: { detail: string }) {
   return (
     <main className="center-stage">
       <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">Workspace Error</p>
-        <h1>NotebookLens could not load this review</h1>
+        <p className="eyebrow">Review problem</p>
+        <h1>NotebookLens could not open this pull request review</h1>
         <p className="hero-summary">{detail}</p>
         <ul className="wall-list">
-          <li>Confirm the workspace check run finished for the latest PR push.</li>
+          <li>Confirm the workspace check run finished for the latest push.</li>
           <li>Make sure your GitHub session still has access to the repository.</li>
-          <li>Retry from the pull request after refreshing your NotebookLens access.</li>
+          <li>Retry from the pull request after refreshing your NotebookLens sign-in.</li>
         </ul>
         <p className="muted-copy">
-          NotebookLens keeps the PR check run as the canonical entry point, so reopening
-          the check run is usually the fastest way back to a healthy review route.
+          Reopening the `NotebookLens Review Workspace` check run from GitHub is usually
+          the fastest way back to the right page.
         </p>
         <div className="wall-actions">
           <Link className="secondary-button" href="/">

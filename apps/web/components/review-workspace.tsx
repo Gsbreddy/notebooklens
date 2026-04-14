@@ -58,25 +58,33 @@ export function ReviewWorkspace({
     : [];
   const latestSnapshotLabel =
     workspace.review.latest_snapshot_index === null
-      ? "No snapshot"
-      : `Latest snapshot ${workspace.review.latest_snapshot_index}`;
+      ? "No review version yet"
+      : `Latest push ${workspace.review.latest_snapshot_index}`;
+  const selectedSnapshotLabel =
+    snapshot === null
+      ? "No version selected"
+      : snapshot.snapshot_index === workspace.review.latest_snapshot_index
+        ? "Reviewing latest push"
+        : `Reviewing push ${snapshot.snapshot_index}`;
+  const reviewStatusLabel = formatReviewStatusLabel(workspace.review.status);
 
   return (
     <div className="workspace-shell">
       <header className="hero-card workspace-header">
         <div className="hero-copy workspace-header-copy">
           <p className="workspace-breadcrumb">
-            {workspace.review.installation.account_login} / {workspace.review.owner} / {workspace.review.repo}
+            NotebookLens review workspace
           </p>
           <h1 className="workspace-title">
             {workspace.review.owner}/{workspace.review.repo} PR #
             {workspace.review.pull_number}
           </h1>
           <p className="hero-summary workspace-lead">
-            Latest notebook-aware diff with snapshot history and inline discussion.
+            Review the notebook changes, outputs, and discussion for this pull request.
           </p>
           <div className="hero-meta workspace-meta">
-            <StatusPill label={`Review ${workspace.review.status}`} tone="default" />
+            <StatusPill label={reviewStatusLabel} tone="default" />
+            <StatusPill label={selectedSnapshotLabel} tone="default" />
             <StatusPill label={latestSnapshotLabel} tone="default" />
             <StatusPill
               label={`${workspace.review.thread_counts.unresolved} open`}
@@ -129,15 +137,15 @@ export function ReviewWorkspace({
             <SnapshotOverview review={workspace.review} snapshot={snapshot} />
           ) : (
             <EmptyState
-              title="No review snapshot is available yet"
-              description="The managed review exists, but there is not a selected snapshot to render."
+              title="This review is not ready yet"
+              description="Open the PR check run again after NotebookLens finishes preparing the next review version."
             />
           )}
 
           {snapshot?.status === "failed" ? (
             <EmptyState
-              title="Snapshot build failed"
-              description={snapshot.failure_reason ?? "NotebookLens could not build this snapshot."}
+              title="NotebookLens could not prepare this review"
+              description={snapshot.failure_reason ?? "Try reopening the PR check run after the latest push finishes."}
             />
           ) : null}
 
@@ -161,24 +169,24 @@ export function ReviewWorkspace({
           {snapshot?.status === "ready" &&
           visibleNotebooks.length === 0 ? (
             <EmptyState
-              title="No notebook diffs in this snapshot"
-              description="NotebookLens did not persist any notebook-aware render rows for the selected revision."
+              title="No reviewable notebook changes on this version"
+              description="Choose another PR version from the sidebar if you want to compare a different push."
             />
           ) : null}
         </main>
 
         <aside className="workspace-sidebar">
           <section className="side-card">
-            <h2>Workspace Quick Tips</h2>
+            <h2>Where to look first</h2>
             <ul className="text-list">
-              <li>Open threads on changed blocks in the latest ready snapshot.</li>
-              <li>Use snapshot history to confirm whether open threads were carried forward.</li>
-              <li>Mirror status shows whether GitHub reviewers can continue in the native PR thread.</li>
+              <li>Start with notebooks that already have open threads or reviewer notices.</li>
+              <li>Use PR versions to compare the latest push with earlier changes when context is missing.</li>
+              <li>GitHub status shows whether teammates can continue the discussion from the native PR.</li>
             </ul>
           </section>
 
           <section className="side-card">
-            <h2>Snapshot History</h2>
+            <h2>PR Versions</h2>
             <div className="history-list">
               {workspace.review.snapshot_history
                 .slice()
@@ -209,8 +217,9 @@ export function ReviewWorkspace({
                       key={entry.id}
                     >
                       <span>
-                        Snapshot {entry.snapshot_index}
-                        {entry.is_latest ? " latest" : ""}
+                        {entry.is_latest
+                          ? `Latest push (${entry.snapshot_index})`
+                          : `Push ${entry.snapshot_index}`}
                       </span>
                       <span className="history-caption">{entry.head_sha.slice(0, 12)}</span>
                     </Link>
@@ -220,7 +229,7 @@ export function ReviewWorkspace({
           </section>
 
           <section className="side-card">
-            <h2>Review Notes</h2>
+            <h2>Heads Up</h2>
             {snapshot?.payload.review.notices?.length ? (
               <ul className="chip-list">
                 {snapshot.payload.review.notices.map((notice) => (
@@ -230,7 +239,7 @@ export function ReviewWorkspace({
                 ))}
               </ul>
             ) : (
-              <p className="muted-copy">No global notices on this snapshot.</p>
+              <p className="muted-copy">No workspace-wide notes for this PR version.</p>
             )}
           </section>
 
@@ -245,7 +254,7 @@ export function ReviewWorkspace({
                 ))}
               </ul>
             ) : (
-              <p className="muted-copy">No deterministic findings were recorded.</p>
+              <p className="muted-copy">No flagged findings on this PR version.</p>
             )}
           </section>
 
@@ -260,7 +269,7 @@ export function ReviewWorkspace({
                 ))}
               </ul>
             ) : (
-              <p className="muted-copy">No reviewer guidance matched this snapshot.</p>
+              <p className="muted-copy">No extra reviewer guidance for this PR version.</p>
             )}
           </section>
         </aside>
@@ -281,13 +290,16 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
     <section className="summary-card snapshot-overview-card">
       <div className="summary-head snapshot-overview-head">
         <div>
-          <p className="eyebrow">Snapshot {snapshot.snapshot_index}</p>
-          <h2 className="snapshot-overview-title">Ready to review</h2>
+          <p className="eyebrow">PR version {snapshot.snapshot_index}</p>
+          <h2 className="snapshot-overview-title">What changed in this push</h2>
         </div>
-        <StatusPill label={snapshot.status} tone={snapshot.status === "failed" ? "danger" : "default"} />
+        <StatusPill
+          label={formatSnapshotStatusLabel(snapshot.status)}
+          tone={snapshot.status === "failed" ? "danger" : "default"}
+        />
       </div>
       <div className="snapshot-strip snapshot-context-strip">
-        <span>Created {formatTimestamp(snapshot.created_at)}</span>
+        <span>Prepared {formatTimestamp(snapshot.created_at)}</span>
         <span>
           {review.base_branch} · {snapshot.base_sha.slice(0, 12)} {"->"} {snapshot.head_sha.slice(0, 12)}
         </span>
@@ -303,11 +315,11 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
           <strong>#{review.pull_number}</strong>
         </div>
         <div className="summary-metric snapshot-metric">
-          <span className="summary-label">Base</span>
+          <span className="summary-label">Compared against</span>
           <strong>{review.base_branch}</strong>
         </div>
         <div className="summary-metric snapshot-metric">
-          <span className="summary-label">Head SHA</span>
+          <span className="summary-label">Latest commit in view</span>
           <strong>{snapshot.head_sha.slice(0, 12)}</strong>
         </div>
         <div className="summary-metric snapshot-metric">
@@ -346,16 +358,16 @@ function NotebookCard({
     <section className="notebook-card">
       <div className="notebook-head">
         <div>
-          <p className="eyebrow">Notebook Diff</p>
+          <p className="eyebrow">Changed notebook</p>
           <h2>{fileLabel}</h2>
           <p className="notebook-subpath">{directoryLabel}</p>
         </div>
-        <StatusPill label={notebook.change_type} tone="default" />
+        <StatusPill label={formatChangeTypeLabel(notebook.change_type)} tone="default" />
       </div>
 
       <div className="notebook-stats">
         <div className="notebook-stat">
-          <span className="summary-label">Changed rows</span>
+          <span className="summary-label">Review items</span>
           <strong>{visibleRows.length}</strong>
         </div>
         <div className="notebook-stat">
@@ -363,8 +375,8 @@ function NotebookCard({
           <strong>{threadCount}</strong>
         </div>
         <div className="notebook-stat">
-          <span className="summary-label">Snapshot</span>
-          <strong>{snapshot.snapshot_index}</strong>
+          <span className="summary-label">PR version</span>
+          <strong>#{snapshot.snapshot_index}</strong>
         </div>
       </div>
 
@@ -426,7 +438,7 @@ function CellRowCard({
         <div>
           <p className="eyebrow">{formatCellLabel(row)}</p>
           <h3>
-            {row.cell_type} cell · {row.change_type}
+            {formatCellTypeLabel(row.cell_type)} · {formatRowChangeLabel(row.change_type)}
           </h3>
         </div>
         <div className="cell-card-meta">
@@ -463,9 +475,9 @@ function CellRowCard({
                 </div>
                 <div className="diff-block-meta">
                   {isBlockChanged(row, blockKind) ? (
-                    <StatusPill label="changed" tone="accent" />
+                    <StatusPill label="changed here" tone="accent" />
                   ) : (
-                    <StatusPill label="thread only" tone="default" />
+                    <StatusPill label="discussion only" tone="default" />
                   )}
                   {threads.length ? (
                     <StatusPill label={`${threads.length} thread${threads.length === 1 ? "" : "s"}`} tone="default" />
@@ -628,7 +640,7 @@ function ThreadColumn({
         <div>
           <h5>Inline threads</h5>
           <p className="muted-copy">
-            Keep discussion attached to this diff block across snapshot history.
+            Keep questions and decisions attached to this part of the review.
           </p>
         </div>
       </div>
@@ -654,7 +666,7 @@ function ThreadColumn({
           </label>
           <div className="thread-form-actions">
             <p className="muted-copy">
-              Threads stay anchored to this block and can carry forward with later snapshots.
+              NotebookLens keeps this discussion tied to the same review area as later pushes arrive, when possible.
             </p>
             <button className="primary-button" type="submit">
               Create thread
@@ -663,7 +675,7 @@ function ThreadColumn({
         </form>
       ) : (
         <p className="muted-copy">
-          New threads can only be created on changed blocks in the latest ready snapshot.
+          New threads can only be started on changed areas in the latest ready PR version.
         </p>
       )}
 
@@ -700,14 +712,14 @@ function ThreadCard({
         </div>
         <div className="thread-head-pills">
           <StatusPill label={thread.status} tone={threadTone(thread.status)} />
-          {thread.carried_forward ? <StatusPill label="carried forward" tone="accent" /> : null}
+          {thread.carried_forward ? <StatusPill label="continued here" tone="accent" /> : null}
         </div>
       </div>
 
       <section className="mirror-card">
         <div className="mirror-head">
           <div>
-            <p className="eyebrow">GitHub Mirror</p>
+            <p className="eyebrow">GitHub PR thread</p>
             <h6>{mirrorStatus.label}</h6>
           </div>
           <StatusPill label={mirrorStatus.label} tone={mirrorStatus.tone} />
@@ -819,7 +831,7 @@ function EmptyState({
 }) {
   return (
     <section className="summary-card empty-state-card">
-      <p className="eyebrow">Workspace Status</p>
+      <p className="eyebrow">Review status</p>
       <h2>{title}</h2>
       <p className="muted-copy">{description}</p>
     </section>
@@ -829,12 +841,12 @@ function EmptyState({
 
 function blockTitle(blockKind: SnapshotBlockKind): string {
   if (blockKind === "source") {
-    return "Source diff";
+    return "Code changes";
   }
   if (blockKind === "outputs") {
-    return "Output summary diff";
+    return "Output changes";
   }
-  return "Metadata diff";
+  return "Metadata changes";
 }
 
 
@@ -867,6 +879,73 @@ function outputChangeTone(
     return "warning";
   }
   return "default";
+}
+
+
+function formatReviewStatusLabel(status: WorkspacePayload["review"]["status"]): string {
+  if (status === "ready") {
+    return "Review ready";
+  }
+  if (status === "pending") {
+    return "Preparing review";
+  }
+  if (status === "failed") {
+    return "Needs attention";
+  }
+  return "Review closed";
+}
+
+
+function formatSnapshotStatusLabel(status: ReviewSnapshotRecord["status"]): string {
+  if (status === "ready") {
+    return "Ready to review";
+  }
+  if (status === "pending") {
+    return "Preparing";
+  }
+  return "Needs attention";
+}
+
+
+function formatChangeTypeLabel(changeType: SnapshotNotebook["change_type"]): string {
+  if (changeType === "modified") {
+    return "updated";
+  }
+  if (changeType === "added") {
+    return "new";
+  }
+  if (changeType === "deleted") {
+    return "removed";
+  }
+  return changeType;
+}
+
+
+function formatCellTypeLabel(cellType: RenderRow["cell_type"]): string {
+  if (cellType === "code") {
+    return "Code cell";
+  }
+  if (cellType === "markdown") {
+    return "Markdown cell";
+  }
+  return "Raw cell";
+}
+
+
+function formatRowChangeLabel(changeType: RenderRow["change_type"]): string {
+  if (changeType === "modified") {
+    return "updated";
+  }
+  if (changeType === "added") {
+    return "added";
+  }
+  if (changeType === "deleted") {
+    return "removed";
+  }
+  if (changeType === "output_changed") {
+    return "outputs changed";
+  }
+  return "moved";
 }
 
 

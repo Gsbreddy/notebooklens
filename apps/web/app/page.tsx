@@ -6,16 +6,16 @@ export default function HomePage() {
       <section className="hero-card landing-hero">
         <div className="hero-copy">
           <p className="eyebrow">NotebookLens Review Workspace</p>
-          <h1>Open hosted notebook reviews straight from a GitHub pull request</h1>
+          <h1>Open notebook reviews from the pull request and get straight to what changed</h1>
           <p className="hero-summary">
             NotebookLens turns changed <code>.ipynb</code> files into a
-            review workspace with snapshot history, image-aware diffs, reviewer
-            guidance, and inline discussion threads.
+            review workspace with visual diffs, changed outputs, reviewer
+            guidance, and inline discussion.
           </p>
           <p className="hero-subsummary">
-            If ReviewNB feels seamless, this page should too: install the app, open
-            a pull request with notebook changes, and jump into one review route
-            instead of piecing context together from raw JSON diffs.
+            Install the app, open a pull request with notebook changes, and jump into
+            one review page instead of piecing context together from raw notebook JSON
+            and scattered comments.
           </p>
           <div className="hero-meta">
             <span className="status-pill tone-accent">Managed workspace beta</span>
@@ -30,7 +30,7 @@ export default function HomePage() {
           </a>
           <a
             className="secondary-button"
-            href="https://notebooklens.github.io/notebooklens/"
+            href="https://github.com/Gsbreddy/notebooklens#readme"
             rel="noreferrer"
             target="_blank"
           >
@@ -42,13 +42,13 @@ export default function HomePage() {
       <section className="landing-grid">
         <article className="summary-card landing-card">
           <p className="eyebrow">Shortest Evaluator Flow</p>
-          <h2>How teams usually test NotebookLens</h2>
+          <h2>How teams usually try NotebookLens</h2>
           <ol className="landing-list">
             <li>Install the NotebookLens GitHub App on a repo with notebooks.</li>
             <li>Sign in here with GitHub OAuth.</li>
             <li>Open or update a pull request with notebook changes.</li>
             <li>Open the “NotebookLens Review Workspace” check run from GitHub.</li>
-            <li>Review the latest snapshot and start inline threads on changed blocks.</li>
+            <li>Review the latest changes and start inline threads on the parts that matter.</li>
           </ol>
         </article>
 
@@ -68,12 +68,12 @@ export default function HomePage() {
 
         <article className="summary-card landing-card">
           <p className="eyebrow">What You See In The Workspace</p>
-          <h2>One review route, three layers of context</h2>
+          <h2>One review page, three layers of context</h2>
           <div className="landing-feature-stack">
             <div className="landing-feature">
-              <strong>Snapshot history</strong>
+              <strong>PR version history</strong>
               <p className="muted-copy">
-                Switch between PR revisions without losing thread context.
+                Compare the latest push with earlier review versions when context is missing.
               </p>
             </div>
             <div className="landing-feature">
@@ -93,20 +93,20 @@ export default function HomePage() {
 
         <article className="summary-card landing-card landing-card-wide">
           <p className="eyebrow">Why Teams Use It</p>
-          <h2>Notebook review without losing the PR workflow</h2>
+          <h2>Notebook review without leaving the PR workflow</h2>
           <div className="landing-feature-stack two-column-feature-stack">
             <div className="landing-feature">
               <strong>Stay anchored to GitHub</strong>
               <p className="muted-copy">
                 Reviews still start from a pull request check run, so DS/ML teams keep
-                the same repo workflow they already use.
+                the repo workflow they already know.
               </p>
             </div>
             <div className="landing-feature">
-              <strong>See notebook-specific context</strong>
+              <strong>See the context reviewers actually need</strong>
               <p className="muted-copy">
-                Snapshot history, changed outputs, and inline threads stay attached to
-                the notebook blocks that actually changed.
+                Changed outputs, notebook context, and inline threads stay attached to
+                the exact notebook sections under review.
               </p>
             </div>
           </div>
