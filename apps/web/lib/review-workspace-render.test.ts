@@ -313,7 +313,7 @@ describe("review workspace rendering", () => {
     expect(markup).not.toContain("Output summary diff");
     expect(markup).not.toContain("Metadata diff");
     expect(markup).not.toContain("Metric output changed.");
-    expect(markup).toContain("No reviewable notebook changes on this version");
+    expect(markup).toContain("No reviewable notebook changes on this push");
   });
 
   it("skips empty output cards inside an otherwise meaningful output block", () => {
@@ -384,7 +384,7 @@ describe("review workspace rendering", () => {
       ),
     );
 
-    expect(markup).toContain("Snapshot details");
+    expect(markup).toContain("Push details");
     expect(markup).toContain("Jump between notebooks");
     expect(markup).toContain("2 changed notebooks");
     expect(markup).toContain("Two notebooks changed in this review version.");
@@ -431,13 +431,14 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Next unresolved thread");
     expect(markup).toContain("Next changed output");
     expect(markup).toContain("Back to top");
-    expect(markup).toContain("Switch PR version");
+    expect(markup).toContain("Switch push");
     expect(markup).toContain("Open thread");
+    expect(markup).not.toContain("Switch PR version");
     expect(markup).not.toContain("PR Versions");
     expect(markup).not.toContain("Where to look first");
     expect(markup).not.toContain("Review signals");
     expect(markup).not.toContain("Workspace access");
-    expect(markup).toContain("Review notes");
+    expect(markup).toContain("What needs attention");
     expect(markup).toContain("Check the staged benchmark inputs before merging.");
     expect(markup).toContain("Validation accuracy regressed in the benchmark output.");
     expect(markup).toContain("Confirm whether the metric drop is expected for this push.");
@@ -448,9 +449,11 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Re-run this notebook after refreshing the staged fixture data.");
     expect(markup).not.toContain("Review items");
     expect(markup).not.toContain("Inline threads");
-    expect(markup).not.toContain("PR version</span><strong>#2</strong>");
-    expect(markup).toContain("Session &amp; review settings");
-    expect(markup).toContain("Open LiteLLM settings");
+    expect(markup).not.toContain("PR version");
+    expect(markup).not.toContain("Review notes");
+    expect(markup).not.toContain("installation-scoped");
+    expect(markup).toContain("Sign-in &amp; team settings");
+    expect(markup).toContain("Open team AI settings");
   });
 
   it("renders existing threads as collapsed summaries with compact GitHub metadata", () => {

@@ -54,7 +54,7 @@ function AuthWall({ currentPath }: { currentPath: string }) {
   return (
     <main className="center-stage">
       <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">Review access</p>
+        <p className="eyebrow">GitHub sign-in</p>
         <h1>Sign in with GitHub to open this pull request review</h1>
         <p className="hero-summary">
           NotebookLens checks your GitHub access before it shows notebook changes,
@@ -87,11 +87,11 @@ function ErrorWall({ detail }: { detail: string }) {
   return (
     <main className="center-stage">
       <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">Review problem</p>
+        <p className="eyebrow">Review unavailable</p>
         <h1>NotebookLens could not open this pull request review</h1>
         <p className="hero-summary">{detail}</p>
         <ul className="wall-list">
-          <li>Confirm the workspace check run finished for the latest push.</li>
+          <li>Confirm the GitHub check run finished for the latest push.</li>
           <li>Make sure your GitHub session still has access to the repository.</li>
           <li>Retry from the pull request after refreshing your NotebookLens sign-in.</li>
         </ul>

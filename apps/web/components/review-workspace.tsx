@@ -80,11 +80,11 @@ export function ReviewWorkspace({
   const primaryOpenThread = railNavigation.orderedOpenThreads[0] ?? openThreads[0] ?? null;
   const latestSnapshotLabel =
     workspace.review.latest_snapshot_index === null
-      ? "No review version yet"
+      ? "No push ready yet"
       : `Latest push ${workspace.review.latest_snapshot_index}`;
   const selectedSnapshotLabel =
     snapshot === null
-      ? "No version selected"
+      ? "No push selected"
       : snapshot.snapshot_index === workspace.review.latest_snapshot_index
         ? "Reviewing latest push"
         : `Reviewing push ${snapshot.snapshot_index}`;
@@ -143,7 +143,7 @@ export function ReviewWorkspace({
           ) : (
             <EmptyState
               title="This review is not ready yet"
-              description="Open the PR check run again after NotebookLens finishes preparing the next review version."
+              description="Open the PR check run again after NotebookLens finishes loading the latest push."
             />
           )}
 
@@ -221,8 +221,8 @@ export function ReviewWorkspace({
           {snapshot?.status === "ready" &&
           visibleNotebooks.length === 0 ? (
             <EmptyState
-              title="No reviewable notebook changes on this version"
-              description="Choose another PR version from the sidebar if you want to compare a different push."
+              title="No reviewable notebook changes on this push"
+              description="Choose another push from the sidebar if you want to compare a different update."
             />
           ) : null}
         </main>
@@ -250,7 +250,7 @@ export function ReviewWorkspace({
       <details className="summary-card workspace-utility-card">
         <summary className="workspace-utility-summary">
           <span>
-            <strong>Session &amp; review settings</strong>
+            <strong>Sign-in &amp; team settings</strong>
             <span className="history-caption notebook-jump-summary-copy">
               Keep these nearby without interrupting the diff.
             </span>
@@ -259,12 +259,12 @@ export function ReviewWorkspace({
         </summary>
         <div className="workspace-utility-panel">
           <p className="muted-copy">
-            Refresh access, sign out, or adjust installation-scoped AI settings for{" "}
+            Refresh GitHub access, sign out, or adjust team AI settings for{" "}
             {installationLabel}.
           </p>
           <div className="workspace-utility-actions">
             <a className="secondary-button" href={buildLoginHref(currentPath)}>
-              Refresh access
+              Refresh GitHub access
             </a>
             <form action={buildWorkspaceActionPath("logout")} method="post">
               <input name="returnTo" type="hidden" value={currentPath} />
@@ -282,7 +282,7 @@ export function ReviewWorkspace({
                 ) as Route
               }
             >
-              Open LiteLLM settings
+              Open team AI settings
             </Link>
           </div>
         </div>
@@ -308,7 +308,7 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
     <section className="summary-card snapshot-overview-card">
       <div className="summary-head snapshot-overview-head">
         <div>
-          <p className="eyebrow">PR version {snapshot.snapshot_index}</p>
+          <p className="eyebrow">Push {snapshot.snapshot_index}</p>
           <h2 className="snapshot-overview-title">This push at a glance</h2>
           <p className="summary-text snapshot-summary-kicker">
             {snapshot.notebook_count} notebook{snapshot.notebook_count === 1 ? "" : "s"} changed ·{" "}
@@ -328,9 +328,9 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
         <details className="snapshot-disclosure">
           <summary>
             <span>
-              Review notes
+              What needs attention
               <span className="history-caption notebook-jump-summary-copy">
-                {reviewSignalCount} signal{reviewSignalCount === 1 ? "" : "s"}
+                {reviewSignalCount} item{reviewSignalCount === 1 ? "" : "s"}
               </span>
             </span>
             <span className="muted-copy">Expand</span>
@@ -378,7 +378,7 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
         </details>
       ) : null}
       <details className="snapshot-disclosure">
-        <summary>Snapshot details</summary>
+        <summary>Push details</summary>
         <div className="snapshot-disclosure-panel">
           <div className="snapshot-strip snapshot-context-strip">
             <span>Prepared {formatTimestamp(snapshot.created_at)}</span>
@@ -812,7 +812,7 @@ function ThreadColumn({
 
       {showThreadingNote ? (
         <p className="muted-copy">
-          New threads can only start on changed areas in the latest ready snapshot.
+          New threads can only start on changed areas in the latest ready push.
         </p>
       ) : null}
 
@@ -1058,7 +1058,7 @@ function QuickJumpRailCard({
       </div>
       <p className="muted-copy side-card-copy">
         Jump straight to the next notebook, thread, or changed output without
-        letting snapshot switching take over the rail.
+        letting push switching take over the rail.
       </p>
       <div className="sidebar-jump-list">
         <RailJumpButton
@@ -1070,14 +1070,14 @@ function QuickJumpRailCard({
         />
         <RailJumpButton
           activeHash={activeHash}
-          emptyStateLabel="No unresolved threads are attached to this snapshot."
+          emptyStateLabel="No unresolved threads are attached to this push."
           label="Next unresolved thread"
           targets={threadTargets}
           onNavigate={setActiveHash}
         />
         <RailJumpButton
           activeHash={activeHash}
-          emptyStateLabel="No changed outputs are visible in this snapshot."
+          emptyStateLabel="No changed outputs are visible in this push."
           label="Next changed output"
           targets={outputTargets}
           onNavigate={setActiveHash}
@@ -1088,7 +1088,7 @@ function QuickJumpRailCard({
           Back to top
         </a>
         <a className="text-link" href={`#${SNAPSHOT_HISTORY_ID}`}>
-          Switch PR version
+          Switch push
         </a>
       </div>
     </section>
@@ -1147,10 +1147,10 @@ function SnapshotHistoryRailCard({
     <details className="side-card side-card-compact sidebar-disclosure" id={SNAPSHOT_HISTORY_ID}>
       <summary className="sidebar-disclosure-summary">
         <span>
-          <strong>Switch PR version</strong>
+          <strong>Switch push</strong>
           <span className="history-caption notebook-jump-summary-copy">
             {review.snapshot_history.length} saved{" "}
-            {pluralize(review.snapshot_history.length, "version")}
+            {pluralize(review.snapshot_history.length, "push")}
           </span>
         </span>
         <span className="muted-copy">Open only if needed</span>

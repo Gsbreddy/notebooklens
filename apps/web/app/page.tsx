@@ -13,7 +13,7 @@ export default function HomePage() {
           <p className="eyebrow">NotebookLens Review Workspace</p>
           <h1>Review notebook pull requests in one workspace instead of decoding raw <code>.ipynb</code> diffs.</h1>
           <p className="hero-summary">
-            Open the GitHub check run and land on the latest notebook snapshot
+            Open the GitHub check run and land on the latest push
             with changed cells, outputs, and inline threads already anchored to
             the parts reviewers need to inspect.
           </p>
@@ -58,17 +58,17 @@ export default function HomePage() {
             <div className="landing-checkrun-card">
               <div className="landing-checkrun-head">
                 <strong>NotebookLens Review Workspace</strong>
-                <span className="status-pill tone-default">latest snapshot ready</span>
+                <span className="status-pill tone-default">latest push ready</span>
               </div>
               <p className="landing-checkrun-copy">
-                1 open thread · 0 resolved · Open in NotebookLens
+                1 open thread · 0 resolved · Open in GitHub
               </p>
             </div>
 
             <div className="landing-proof-surface">
               <div className="landing-proof-strip">
                 <div>
-                  <p className="eyebrow">Workspace snapshot</p>
+                  <p className="eyebrow">Latest push</p>
                   <h3 className="landing-proof-title">acme/forecasting · PR #128</h3>
                 </div>
                 <div className="landing-proof-meta">
@@ -83,14 +83,14 @@ export default function HomePage() {
                   <strong>sales_forecast.ipynb</strong>
                 </div>
                 <div className="summary-metric landing-proof-metric">
-                  <span className="summary-label">Review surface</span>
+                  <span className="summary-label">What changed</span>
                   <strong>Changed output plot + markdown diff</strong>
                 </div>
               </div>
 
               <ul className="landing-list landing-proof-list">
-                <li>Inspect the changed notebook output without leaving the review surface.</li>
-                <li>See the latest snapshot context before replying on the PR.</li>
+                <li>Inspect the changed notebook output without leaving the review.</li>
+                <li>See the latest push context before replying on the PR.</li>
                 <li>Keep one inline thread attached to the exact changed block.</li>
               </ul>
 
