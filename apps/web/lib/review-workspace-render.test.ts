@@ -243,6 +243,23 @@ function renderWorkspace(row: RenderRow): string {
 
 
 describe("review workspace rendering", () => {
+  it("keeps the create-thread composer hidden until a reviewer opens it", () => {
+    const markup = renderWorkspace(
+      buildRow({
+        source: {
+          base: "print('accuracy')",
+          head: "print('new accuracy')",
+          changed: true,
+        },
+      }),
+    );
+
+    expect(markup).toContain("Add comment");
+    expect(markup).not.toContain("Start a thread");
+    expect(markup).not.toContain("Create thread");
+    expect(markup).not.toContain("Keep it attached to this block.");
+  });
+
   it("suppresses empty output and metadata rows instead of rendering a shell card", () => {
     const markup = renderWorkspace(
       buildRow({

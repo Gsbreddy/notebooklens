@@ -13,6 +13,7 @@ import {
   hasVisibleBlocks,
   isBlockChanged,
   summarizeGitHubMirrorStatus,
+  toggleThreadComposer,
 } from "@/lib/review-workspace";
 import type { RenderRow, ReviewSnapshotRecord, ReviewThread, WorkspaceReview } from "@/lib/types";
 
@@ -197,6 +198,12 @@ describe("review workspace helpers", () => {
         message: "Thread anchor does not exist on the selected snapshot",
       }),
     ).toContain("/reviews/octo/notebooklens/pulls/7/snapshots/2?flash=error");
+  });
+
+  it("keeps only one create-thread composer open at a time", () => {
+    expect(toggleThreadComposer(null, "anchor-a")).toBe("anchor-a");
+    expect(toggleThreadComposer("anchor-a", "anchor-b")).toBe("anchor-b");
+    expect(toggleThreadComposer("anchor-a", "anchor-a")).toBeNull();
   });
 
   it("reports whether a specific block changed", () => {

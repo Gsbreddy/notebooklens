@@ -1,11 +1,11 @@
+"use client";
+
 import type { Route } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  buildApiHref,
-  buildLoginHref,
-} from "@/lib/api";
+import { buildApiHref, buildLoginHref } from "@/lib/public-hrefs";
 import {
   buildAnchorKey,
   buildAiGatewayRoute,
@@ -22,6 +22,7 @@ import {
   summarizeGitHubMirrorStatus,
   summarizeFinding,
   summarizeGuidance,
+  toggleThreadComposer,
 } from "@/lib/review-workspace";
 import type {
   FlashNotice,
@@ -49,6 +50,7 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const snapshot = workspace.snapshot;
   const threadsByAnchor = groupThreadsByAnchor(workspace.threads);
+  const [openComposerKey, setOpenComposerKey] = useState<string | null>(null);
   const visibleNotebooks = snapshot?.status === "ready"
     ? snapshot.payload.review.notebooks.filter(
         (notebook) =>
@@ -68,6 +70,10 @@ export function ReviewWorkspace({
         : `Reviewing push ${snapshot.snapshot_index}`;
   const reviewStatusLabel = formatReviewStatusLabel(workspace.review.status);
   const installationLabel = `${workspace.review.installation.account_login} (${workspace.review.installation.account_type})`;
+
+  useEffect(() => {
+    setOpenComposerKey(null);
+  }, [snapshot?.id]);
 
   return (
     <div className="workspace-shell">
@@ -177,6 +183,12 @@ export function ReviewWorkspace({
                   currentPath={currentPath}
                   key={`${notebook.path}-${snapshot.id}`}
                   notebook={notebook}
+                  onToggleComposer={(composerKey) => {
+                    setOpenComposerKey((currentComposerKey) =>
+                      toggleThreadComposer(currentComposerKey, composerKey),
+                    );
+                  }}
+                  openComposerKey={openComposerKey}
                   reviewId={workspace.review.id}
                   review={workspace.review}
                   snapshot={snapshot}
@@ -411,6 +423,8 @@ type NotebookCardProps = {
   notebook: SnapshotNotebook;
   threadsByAnchor: Map<string, ReviewThread[]>;
   currentPath: string;
+  openComposerKey: string | null;
+  onToggleComposer: (composerKey: string) => void;
 };
 
 
@@ -421,6 +435,8 @@ function NotebookCard({
   notebook,
   threadsByAnchor,
   currentPath,
+  openComposerKey,
+  onToggleComposer,
 }: NotebookCardProps) {
   const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
   const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
@@ -467,6 +483,8 @@ function NotebookCard({
           <CellRowCard
             currentPath={currentPath}
             key={`${notebook.path}-${buildAnchorKey(row.thread_anchors.source)}`}
+            onToggleComposer={onToggleComposer}
+            openComposerKey={openComposerKey}
             review={review}
             reviewId={reviewId}
             row={row}
@@ -487,6 +505,8 @@ type CellRowCardProps = {
   row: RenderRow;
   threadsByAnchor: Map<string, ReviewThread[]>;
   currentPath: string;
+  openComposerKey: string | null;
+  onToggleComposer: (composerKey: string) => void;
 };
 
 
@@ -497,6 +517,8 @@ function CellRowCard({
   row,
   threadsByAnchor,
   currentPath,
+  openComposerKey,
+  onToggleComposer,
 }: CellRowCardProps) {
   const blocks = getVisibleBlockKinds(row, threadsByAnchor);
   const changedBlockCount = blocks.filter((blockKind) => isBlockChanged(row, blockKind)).length;
@@ -532,6 +554,9 @@ function CellRowCard({
       <div className="block-stack">
         {blocks.map((blockKind) => {
           const anchor = row.thread_anchors[blockKind];
+          const composerKey = buildAnchorKey(anchor);
+          const composerId = buildThreadComposerId(anchor);
+          const composerOpen = openComposerKey === composerKey;
           const threads = threadsByAnchor.get(buildAnchorKey(anchor)) ?? [];
           const threadable = canStartThread(review, snapshot, row, blockKind);
 
@@ -550,6 +575,17 @@ function CellRowCard({
                   {threads.length ? (
                     <StatusPill label={`${threads.length} thread${threads.length === 1 ? "" : "s"}`} tone="default" />
                   ) : null}
+                  {threadable ? (
+                    <button
+                      aria-controls={composerId}
+                      aria-expanded={composerOpen}
+                      className={`${composerOpen ? "secondary-button" : "ghost-button"} thread-affordance-button`}
+                      onClick={() => onToggleComposer(composerKey)}
+                      type="button"
+                    >
+                      {composerOpen ? "Commenting" : "Add comment"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -557,7 +593,10 @@ function CellRowCard({
 
               <ThreadColumn
                 anchor={anchor}
+                composerId={composerId}
+                composerOpen={composerOpen}
                 currentPath={currentPath}
+                onCancelComposer={() => onToggleComposer(composerKey)}
                 reviewId={reviewId}
                 snapshotId={snapshot.id}
                 threadable={threadable}
@@ -689,6 +728,9 @@ type ThreadColumnProps = {
   threads: ReviewThread[];
   threadable: boolean;
   currentPath: string;
+  composerOpen: boolean;
+  composerId: string;
+  onCancelComposer: () => void;
 };
 
 
@@ -699,6 +741,9 @@ function ThreadColumn({
   threads,
   threadable,
   currentPath,
+  composerOpen,
+  composerId,
+  onCancelComposer,
 }: ThreadColumnProps) {
   return (
     <div className="thread-column">
@@ -712,38 +757,22 @@ function ThreadColumn({
         ) : null}
       </div>
 
-      {threadable ? (
-        <form
-          action={buildWorkspaceActionPath("create-thread")}
-          className="thread-form thread-form-inline"
-          method="post"
-        >
-          <input name="returnTo" type="hidden" value={currentPath} />
-          <input name="reviewId" type="hidden" value={reviewId} />
-          <input name="snapshotId" type="hidden" value={snapshotId} />
-          <input name="anchorJson" type="hidden" value={JSON.stringify(anchor)} />
-          <div className="thread-form-inline-head">
-            <strong>Start a thread</strong>
-            <span className="muted-copy">Keep it attached to this block.</span>
-          </div>
-          <textarea
-            name="bodyMarkdown"
-            placeholder="Ask for context, call out a regression, or note the follow-up you want here."
-            required
-            rows={3}
-          />
-          <div className="thread-form-actions">
-            <span className="muted-copy">Posts to this review block.</span>
-            <button className="primary-button" type="submit">
-              Create thread
-            </button>
-          </div>
-        </form>
-      ) : (
+      {threadable && composerOpen ? (
+        <InlineThreadComposer
+          anchor={anchor}
+          composerId={composerId}
+          currentPath={currentPath}
+          onCancel={onCancelComposer}
+          reviewId={reviewId}
+          snapshotId={snapshotId}
+        />
+      ) : null}
+
+      {!threadable ? (
         <p className="muted-copy">
           New threads can only start on changed areas in the latest ready snapshot.
         </p>
-      )}
+      ) : null}
 
       {threads.length ? (
         <div className="thread-stack">
@@ -755,6 +784,70 @@ function ThreadColumn({
         <p className="muted-copy">No discussion on this block yet.</p>
       )}
     </div>
+  );
+}
+
+
+function InlineThreadComposer({
+  reviewId,
+  snapshotId,
+  anchor,
+  currentPath,
+  composerId,
+  onCancel,
+}: {
+  reviewId: string;
+  snapshotId: string;
+  anchor: ThreadAnchor;
+  currentPath: string;
+  composerId: string;
+  onCancel: () => void;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const focusHandle = window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusHandle);
+    };
+  }, []);
+
+  return (
+    <form
+      action={buildWorkspaceActionPath("create-thread")}
+      className="thread-form thread-form-inline"
+      id={composerId}
+      method="post"
+    >
+      <input name="returnTo" type="hidden" value={currentPath} />
+      <input name="reviewId" type="hidden" value={reviewId} />
+      <input name="snapshotId" type="hidden" value={snapshotId} />
+      <input name="anchorJson" type="hidden" value={JSON.stringify(anchor)} />
+      <div className="thread-form-inline-head">
+        <strong>Start a thread</strong>
+        <span className="muted-copy">Keep it attached to this block.</span>
+      </div>
+      <textarea
+        autoFocus
+        name="bodyMarkdown"
+        placeholder="Ask for context, call out a regression, or note the follow-up you want here."
+        ref={textareaRef}
+        required
+        rows={3}
+      />
+      <div className="thread-form-actions">
+        <span className="muted-copy">Posts to this review block.</span>
+        <button className="ghost-button thread-inline-button" onClick={onCancel} type="button">
+          Cancel
+        </button>
+        <button className="primary-button thread-inline-button" type="submit">
+          Create thread
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1048,6 +1141,14 @@ function countThreadsForNotebook(
 
 function buildNotebookSectionId(path: string): string {
   return `notebook-${path
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")}`;
+}
+
+
+function buildThreadComposerId(anchor: ThreadAnchor): string {
+  return `thread-composer-${buildAnchorKey(anchor)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")}`;

@@ -163,6 +163,14 @@ export function buildWorkspaceActionPath(
 }
 
 
+export function toggleThreadComposer(
+  currentComposerKey: string | null,
+  requestedComposerKey: string,
+): string | null {
+  return currentComposerKey === requestedComposerKey ? null : requestedComposerKey;
+}
+
+
 export function buildFlashRedirect(
   returnTo: string,
   notice: FlashNotice,
