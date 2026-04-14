@@ -343,7 +343,7 @@ describe("review workspace rendering", () => {
       }),
     );
 
-    expect(markup).toContain("Output changes");
+    expect(markup).toContain("Outputs");
     expect(markup).toContain("Accuracy dropped from 0.92 to 0.88.");
     expect(markup).not.toContain("execute_result");
   });
@@ -426,8 +426,14 @@ describe("review workspace rendering", () => {
 
     const markup = renderWorkspacePayload(workspace);
 
-    expect(markup).toContain("PR Versions");
+    expect(markup).toContain("Quick jumps");
+    expect(markup).toContain("Next notebook with open threads");
+    expect(markup).toContain("Next unresolved thread");
+    expect(markup).toContain("Next changed output");
+    expect(markup).toContain("Back to top");
+    expect(markup).toContain("Switch PR version");
     expect(markup).toContain("Open thread");
+    expect(markup).not.toContain("PR Versions");
     expect(markup).not.toContain("Where to look first");
     expect(markup).not.toContain("Review signals");
     expect(markup).not.toContain("Workspace access");
@@ -479,6 +485,8 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Please explain why the validation accuracy regressed on this output.");
     expect(markup).toContain("GitHub: Mirrored to GitHub");
     expect(markup).toContain("Open mirrored PR thread");
+    expect(markup).toContain('href="#thread-thread-id"');
+    expect(markup).toContain('id="thread-thread-id"');
     expect(markup).toContain('class="thread-card thread-card-flat thread-details"');
     expect(markup).not.toContain('thread-card thread-card-flat thread-details" open');
   });

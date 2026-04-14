@@ -43,6 +43,22 @@ type ReviewWorkspaceProps = {
   flashNotice: FlashNotice | null;
 };
 
+const WORKSPACE_TOP_ID = "review-workspace-top";
+const SNAPSHOT_HISTORY_ID = "workspace-snapshot-history";
+
+type RailJumpTarget = {
+  id: string;
+  label: string;
+  caption: string;
+};
+
+type RailNavigationData = {
+  notebookTargets: RailJumpTarget[];
+  threadTargets: RailJumpTarget[];
+  outputTargets: RailJumpTarget[];
+  orderedOpenThreads: ReviewThread[];
+};
+
 
 export function ReviewWorkspace({
   workspace,
@@ -52,7 +68,6 @@ export function ReviewWorkspace({
   const snapshot = workspace.snapshot;
   const threadsByAnchor = groupThreadsByAnchor(workspace.threads);
   const openThreads = workspace.threads.filter((thread) => thread.status === "open");
-  const primaryOpenThread = openThreads[0] ?? null;
   const [openComposerKey, setOpenComposerKey] = useState<string | null>(null);
   const visibleNotebooks = snapshot?.status === "ready"
     ? snapshot.payload.review.notebooks.filter(
@@ -61,6 +76,8 @@ export function ReviewWorkspace({
           notebook.render_rows.some((row) => hasVisibleBlocks(row, threadsByAnchor)),
       )
     : [];
+  const railNavigation = collectRailNavigationData(visibleNotebooks, threadsByAnchor);
+  const primaryOpenThread = railNavigation.orderedOpenThreads[0] ?? openThreads[0] ?? null;
   const latestSnapshotLabel =
     workspace.review.latest_snapshot_index === null
       ? "No review version yet"
@@ -79,7 +96,7 @@ export function ReviewWorkspace({
   }, [snapshot?.id]);
 
   return (
-    <div className="workspace-shell">
+    <div className="workspace-shell" id={WORKSPACE_TOP_ID}>
       <header className="summary-card workspace-pr-strip">
         <div className="workspace-pr-strip-main">
           <p className="workspace-breadcrumb">
@@ -211,48 +228,13 @@ export function ReviewWorkspace({
         </main>
 
         <aside className="workspace-sidebar">
-          <section className="side-card">
-            <h2>PR Versions</h2>
-            <div className="history-list">
-              {workspace.review.snapshot_history
-                .slice()
-                .reverse()
-                .map((entry) => {
-                  const href = entry.is_latest
-                    ? buildSnapshotRoute(
-                        workspace.review.owner,
-                        workspace.review.repo,
-                        workspace.review.pull_number,
-                        null,
-                      )
-                    : buildSnapshotRoute(
-                        workspace.review.owner,
-                        workspace.review.repo,
-                        workspace.review.pull_number,
-                        entry.snapshot_index,
-                      );
-
-                  return (
-                    <Link
-                      className={`history-link ${
-                        workspace.review.selected_snapshot_index === entry.snapshot_index
-                          ? "history-link-active"
-                          : ""
-                      }`}
-                      href={href as Route}
-                      key={entry.id}
-                    >
-                      <span>
-                        {entry.is_latest
-                          ? `Latest push (${entry.snapshot_index})`
-                          : `Push ${entry.snapshot_index}`}
-                      </span>
-                      <span className="history-caption">{entry.head_sha.slice(0, 12)}</span>
-                    </Link>
-                  );
-                })}
-            </div>
-          </section>
+          {snapshot?.status === "ready" ? (
+            <QuickJumpRailCard
+              notebookTargets={railNavigation.notebookTargets}
+              outputTargets={railNavigation.outputTargets}
+              threadTargets={railNavigation.threadTargets}
+            />
+          ) : null}
 
           {primaryOpenThread ? (
             <OpenThreadRailCard
@@ -260,6 +242,8 @@ export function ReviewWorkspace({
               thread={primaryOpenThread}
             />
           ) : null}
+
+          <SnapshotHistoryRailCard review={workspace.review} />
         </aside>
       </div>
 
@@ -546,7 +530,7 @@ function OpenThreadRailCard({
       </p>
       <a
         className="history-link rail-thread-link"
-        href={`#${buildNotebookSectionId(thread.anchor.notebook_path)}`}
+        href={`#${buildThreadSectionId(thread.id)}`}
       >
         <span className="notebook-jump-copy">
           <strong>{fileLabel}</strong>
@@ -625,7 +609,11 @@ function CellRowCard({
           const threadable = canStartThread(review, snapshot, row, blockKind);
 
           return (
-            <section className="diff-block diff-block-flat" key={blockKind}>
+            <section
+              className="diff-block diff-block-flat"
+              id={buildBlockSectionId(anchor)}
+              key={blockKind}
+            >
               <div className="diff-block-head">
                 <h4>{blockTitle(blockKind)}</h4>
                 <div className="diff-block-meta">
@@ -917,7 +905,10 @@ function ThreadCard({
   const messageCount = thread.messages.length;
 
   return (
-    <details className="thread-card thread-card-flat thread-details">
+    <details
+      className="thread-card thread-card-flat thread-details"
+      id={buildThreadSectionId(thread.id)}
+    >
       <summary className="thread-summary">
         <div className="thread-summary-main">
           <div className="thread-heading-copy">
@@ -1030,6 +1021,178 @@ function ThreadCard({
             </button>
           </form>
         )}
+      </div>
+    </details>
+  );
+}
+
+
+function QuickJumpRailCard({
+  notebookTargets,
+  threadTargets,
+  outputTargets,
+}: {
+  notebookTargets: RailJumpTarget[];
+  threadTargets: RailJumpTarget[];
+  outputTargets: RailJumpTarget[];
+}) {
+  const [activeHash, setActiveHash] = useState("");
+
+  useEffect(() => {
+    const syncHash = () => {
+      setActiveHash(window.location.hash);
+    };
+
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => {
+      window.removeEventListener("hashchange", syncHash);
+    };
+  }, []);
+
+  return (
+    <section className="side-card side-card-compact">
+      <div className="sidebar-rail-head">
+        <h2>Quick jumps</h2>
+        <StatusPill label="Reviewer first" tone="accent" />
+      </div>
+      <p className="muted-copy side-card-copy">
+        Jump straight to the next notebook, thread, or changed output without
+        letting snapshot switching take over the rail.
+      </p>
+      <div className="sidebar-jump-list">
+        <RailJumpButton
+          activeHash={activeHash}
+          emptyStateLabel="No notebooks with open threads on this push."
+          label="Next notebook with open threads"
+          targets={notebookTargets}
+          onNavigate={setActiveHash}
+        />
+        <RailJumpButton
+          activeHash={activeHash}
+          emptyStateLabel="No unresolved threads are attached to this snapshot."
+          label="Next unresolved thread"
+          targets={threadTargets}
+          onNavigate={setActiveHash}
+        />
+        <RailJumpButton
+          activeHash={activeHash}
+          emptyStateLabel="No changed outputs are visible in this snapshot."
+          label="Next changed output"
+          targets={outputTargets}
+          onNavigate={setActiveHash}
+        />
+      </div>
+      <div className="sidebar-jump-footer">
+        <a className="text-link" href={`#${WORKSPACE_TOP_ID}`}>
+          Back to top
+        </a>
+        <a className="text-link" href={`#${SNAPSHOT_HISTORY_ID}`}>
+          Switch PR version
+        </a>
+      </div>
+    </section>
+  );
+}
+
+
+function RailJumpButton({
+  activeHash,
+  emptyStateLabel,
+  label,
+  onNavigate,
+  targets,
+}: {
+  activeHash: string;
+  emptyStateLabel: string;
+  label: string;
+  onNavigate: (hash: string) => void;
+  targets: RailJumpTarget[];
+}) {
+  const nextTarget = getNextRailTarget(targets, activeHash);
+  const targetCountLabel =
+    targets.length === 0 ? "Unavailable" : `${targets.length} ${pluralize(targets.length, "target")}`;
+
+  return (
+    <button
+      className="sidebar-jump-button"
+      disabled={nextTarget === null}
+      onClick={() => {
+        if (nextTarget === null) {
+          return;
+        }
+        jumpToFragment(nextTarget.id, onNavigate);
+      }}
+      type="button"
+    >
+      <span className="sidebar-jump-copy">
+        <span className="sidebar-jump-kicker">{label}</span>
+        <strong>{nextTarget?.label ?? "Nothing queued here"}</strong>
+        <span className="history-caption">
+          {nextTarget?.caption ?? emptyStateLabel}
+        </span>
+      </span>
+      <span className="sidebar-jump-meta">{targetCountLabel}</span>
+    </button>
+  );
+}
+
+
+function SnapshotHistoryRailCard({
+  review,
+}: {
+  review: WorkspacePayload["review"];
+}) {
+  return (
+    <details className="side-card side-card-compact sidebar-disclosure" id={SNAPSHOT_HISTORY_ID}>
+      <summary className="sidebar-disclosure-summary">
+        <span>
+          <strong>Switch PR version</strong>
+          <span className="history-caption notebook-jump-summary-copy">
+            {review.snapshot_history.length} saved{" "}
+            {pluralize(review.snapshot_history.length, "version")}
+          </span>
+        </span>
+        <span className="muted-copy">Open only if needed</span>
+      </summary>
+      <div className="history-list">
+        {review.snapshot_history
+          .slice()
+          .reverse()
+          .map((entry) => {
+            const href = entry.is_latest
+              ? buildSnapshotRoute(
+                  review.owner,
+                  review.repo,
+                  review.pull_number,
+                  null,
+                )
+              : buildSnapshotRoute(
+                  review.owner,
+                  review.repo,
+                  review.pull_number,
+                  entry.snapshot_index,
+                );
+
+            return (
+              <Link
+                className={`history-link ${
+                  review.selected_snapshot_index === entry.snapshot_index
+                    ? "history-link-active"
+                    : ""
+                }`}
+                href={href as Route}
+                key={entry.id}
+              >
+                <span>
+                  {entry.is_latest
+                    ? `Latest push (${entry.snapshot_index})`
+                    : `Push ${entry.snapshot_index}`}
+                </span>
+                <span className="history-caption">{entry.head_sha.slice(0, 12)}</span>
+              </Link>
+            );
+          })}
       </div>
     </details>
   );
@@ -1205,6 +1368,71 @@ function countThreadsForNotebook(
 }
 
 
+function collectRailNavigationData(
+  notebooks: SnapshotNotebook[],
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): RailNavigationData {
+  const notebookTargets: RailJumpTarget[] = [];
+  const threadTargets: RailJumpTarget[] = [];
+  const outputTargets: RailJumpTarget[] = [];
+  const orderedOpenThreads: ReviewThread[] = [];
+  const seenThreadIds = new Set<string>();
+
+  for (const notebook of notebooks) {
+    const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
+    const notebookOpenThreads = getThreadsForNotebook(notebook, threadsByAnchor).filter(
+      (thread) => thread.status === "open",
+    );
+
+    if (notebookOpenThreads.length > 0) {
+      notebookTargets.push({
+        id: buildNotebookSectionId(notebook.path),
+        label: fileLabel,
+        caption: `${directoryLabel} · ${notebookOpenThreads.length} open ${pluralize(
+          notebookOpenThreads.length,
+          "thread",
+        )}`,
+      });
+    }
+
+    for (const row of notebook.render_rows) {
+      if (isBlockChanged(row, "outputs") && hasMeaningfulBlockContent(row, "outputs")) {
+        outputTargets.push({
+          id: buildBlockSectionId(row.thread_anchors.outputs),
+          label: `${fileLabel} · ${formatCellLabel(row)}`,
+          caption: row.summary.trim() || `${directoryLabel} · Changed output`,
+        });
+      }
+
+      for (const blockKind of getVisibleBlockKinds(row, threadsByAnchor)) {
+        const threads = threadsByAnchor.get(buildAnchorKey(row.thread_anchors[blockKind])) ?? [];
+
+        for (const thread of threads) {
+          if (thread.status !== "open" || seenThreadIds.has(thread.id)) {
+            continue;
+          }
+
+          seenThreadIds.add(thread.id);
+          orderedOpenThreads.push(thread);
+          threadTargets.push({
+            id: buildThreadSectionId(thread.id),
+            label: `${fileLabel} · ${formatThreadAnchorSummary(thread.anchor)}`,
+            caption: directoryLabel,
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    notebookTargets,
+    threadTargets,
+    outputTargets,
+    orderedOpenThreads,
+  };
+}
+
+
 function getThreadsForNotebook(
   notebook: SnapshotNotebook,
   threadsByAnchor: Map<string, ReviewThread[]>,
@@ -1229,18 +1457,22 @@ function getThreadsForNotebook(
 
 
 function buildNotebookSectionId(path: string): string {
-  return `notebook-${path
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")}`;
+  return `notebook-${toFragmentId(path)}`;
 }
 
 
 function buildThreadComposerId(anchor: ThreadAnchor): string {
-  return `thread-composer-${buildAnchorKey(anchor)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")}`;
+  return `thread-composer-${toFragmentId(buildAnchorFragment(anchor))}`;
+}
+
+
+function buildBlockSectionId(anchor: ThreadAnchor): string {
+  return `block-${toFragmentId(buildAnchorFragment(anchor))}`;
+}
+
+
+function buildThreadSectionId(threadId: string): string {
+  return `thread-${toFragmentId(threadId)}`;
 }
 
 
@@ -1299,4 +1531,66 @@ function formatThreadAnchorSummary(anchor: ThreadAnchor): string {
 
 function pluralize(count: number, singular: string): string {
   return count === 1 ? singular : `${singular}s`;
+}
+
+
+function getNextRailTarget(
+  targets: RailJumpTarget[],
+  activeHash: string,
+): RailJumpTarget | null {
+  if (targets.length === 0) {
+    return null;
+  }
+
+  const currentId = activeHash.startsWith("#") ? activeHash.slice(1) : activeHash;
+  const currentIndex = targets.findIndex((target) => target.id === currentId);
+  if (currentIndex === -1) {
+    return targets[0] ?? null;
+  }
+
+  return targets[(currentIndex + 1) % targets.length] ?? null;
+}
+
+
+function jumpToFragment(fragmentId: string, onNavigate: (hash: string) => void): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const nextHash = `#${fragmentId}`;
+  if (window.location.hash === nextHash) {
+    document.getElementById(fragmentId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    onNavigate(nextHash);
+    return;
+  }
+
+  window.location.hash = fragmentId;
+  onNavigate(nextHash);
+}
+
+
+function buildAnchorFragment(anchor: ThreadAnchor): string {
+  const locator =
+    anchor.cell_locator.display_index ??
+    anchor.cell_locator.head_index ??
+    anchor.cell_locator.base_index ??
+    "notebook";
+
+  return [
+    anchor.notebook_path,
+    anchor.block_kind,
+    locator,
+    anchor.source_fingerprint,
+  ].join("-");
+}
+
+
+function toFragmentId(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

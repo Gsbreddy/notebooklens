@@ -133,6 +133,12 @@ pre {
   gap: 14px;
 }
 
+.notebook-card,
+.diff-block,
+.thread-card {
+  scroll-margin-top: 16px;
+}
+
 .hero-card,
 .summary-card,
 .side-card,
@@ -473,6 +479,7 @@ pre {
 }
 
 .snapshot-disclosure,
+.sidebar-disclosure,
 .notebook-jump-card,
 .notebook-summary-card,
 .workspace-utility-card {
@@ -481,6 +488,7 @@ pre {
 }
 
 .snapshot-disclosure summary,
+.sidebar-disclosure-summary,
 .notebook-jump-summary,
 .notebook-summary-toggle,
 .workspace-utility-summary {
@@ -502,6 +510,7 @@ pre {
 }
 
 .snapshot-disclosure summary::-webkit-details-marker,
+.sidebar-disclosure-summary::-webkit-details-marker,
 .notebook-jump-summary::-webkit-details-marker,
 .notebook-summary-toggle::-webkit-details-marker,
 .workspace-utility-summary::-webkit-details-marker {
@@ -509,6 +518,7 @@ pre {
 }
 
 .snapshot-disclosure summary:hover,
+.sidebar-disclosure-summary:hover,
 .notebook-jump-summary:hover,
 .notebook-summary-toggle:hover,
 .workspace-utility-summary:hover {
@@ -516,6 +526,7 @@ pre {
 }
 
 .snapshot-disclosure[open],
+.sidebar-disclosure[open],
 .notebook-jump-card[open],
 .notebook-summary-card[open],
 .workspace-utility-card[open] {
@@ -523,6 +534,7 @@ pre {
 }
 
 .snapshot-disclosure[open] summary,
+.sidebar-disclosure[open] summary,
 .notebook-jump-card[open] summary,
 .notebook-summary-card[open] summary,
 .workspace-utility-card[open] summary {
@@ -651,6 +663,7 @@ pre {
 .primary-button,
 .secondary-button,
 .ghost-button,
+.sidebar-jump-button,
 .history-link,
 .thread-composer summary,
 .reply-details summary {
@@ -703,6 +716,7 @@ pre {
 .primary-button:hover,
 .secondary-button:hover,
 .ghost-button:hover,
+.sidebar-jump-button:not(:disabled):hover,
 .history-link:hover,
 .thread-composer summary:hover,
 .reply-details summary:hover {
@@ -852,6 +866,62 @@ pre {
 
 .rail-thread-link {
   align-items: flex-start;
+}
+
+.sidebar-jump-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-jump-button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(36, 39, 45, 0.08);
+  background: var(--panel-strong);
+  color: var(--ink);
+  text-align: left;
+}
+
+.sidebar-jump-button:disabled {
+  cursor: default;
+  color: var(--muted);
+  opacity: 0.78;
+}
+
+.sidebar-jump-button:disabled:hover {
+  transform: none;
+}
+
+.sidebar-jump-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.sidebar-jump-kicker {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-jump-meta {
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sidebar-jump-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 12px;
 }
 
 .sidebar-action-stack {
