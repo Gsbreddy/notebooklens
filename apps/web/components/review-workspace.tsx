@@ -50,6 +50,8 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const snapshot = workspace.snapshot;
   const threadsByAnchor = groupThreadsByAnchor(workspace.threads);
+  const openThreads = workspace.threads.filter((thread) => thread.status === "open");
+  const primaryOpenThread = openThreads[0] ?? null;
   const [openComposerKey, setOpenComposerKey] = useState<string | null>(null);
   const visibleNotebooks = snapshot?.status === "ready"
     ? snapshot.payload.review.notebooks.filter(
@@ -209,15 +211,6 @@ export function ReviewWorkspace({
 
         <aside className="workspace-sidebar">
           <section className="side-card">
-            <h2>Where to look first</h2>
-            <ul className="text-list">
-              <li>Start with notebooks that already have open threads or reviewer notices.</li>
-              <li>Use PR versions to compare the latest push with earlier changes when context is missing.</li>
-              <li>GitHub status shows whether teammates can continue the discussion from the native PR.</li>
-            </ul>
-          </section>
-
-          <section className="side-card">
             <h2>PR Versions</h2>
             <div className="history-list">
               {workspace.review.snapshot_history
@@ -260,94 +253,55 @@ export function ReviewWorkspace({
             </div>
           </section>
 
-          <section className="side-card">
-            <h2>Review signals</h2>
-
-            <div className="sidebar-subsection">
-              <p className="sidebar-subtitle">Heads up</p>
-              {snapshot?.payload.review.notices?.length ? (
-                <ul className="chip-list">
-                  {snapshot.payload.review.notices.map((notice) => (
-                    <li className="chip-item" key={notice}>
-                      {notice}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted-copy">No workspace-wide notes for this PR version.</p>
-              )}
-            </div>
-
-            <div className="sidebar-subsection">
-              <p className="sidebar-subtitle">Flagged findings</p>
-              {snapshot?.flagged_findings?.length ? (
-                <ul className="text-list">
-                  {snapshot.flagged_findings.map((finding, index) => (
-                    <li key={`${finding.code ?? "finding"}-${index}`}>
-                      {summarizeFinding(finding)}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted-copy">No flagged findings on this PR version.</p>
-              )}
-            </div>
-
-            <div className="sidebar-subsection">
-              <p className="sidebar-subtitle">Reviewer guidance</p>
-              {snapshot?.reviewer_guidance?.length ? (
-                <ul className="text-list">
-                  {snapshot.reviewer_guidance.map((guidance, index) => (
-                    <li key={`${guidance.label ?? "guidance"}-${index}`}>
-                      {summarizeGuidance(guidance)}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted-copy">No extra reviewer guidance for this PR version.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="side-card side-card-muted">
-            <h2>Workspace access</h2>
-            <p className="muted-copy">
-              Use these controls when you need to refresh your session or adjust
-              installation-level settings. Most reviewers can stay focused on the
-              diff itself.
-            </p>
-            <div className="sidebar-action-stack">
-              <a className="secondary-button" href={buildLoginHref(currentPath)}>
-                Refresh access
-              </a>
-              <form action={buildWorkspaceActionPath("logout")} method="post">
-                <input name="returnTo" type="hidden" value={currentPath} />
-                <button className="ghost-button sidebar-full-width" type="submit">
-                  Sign out
-                </button>
-              </form>
-            </div>
-            <div className="sidebar-subsection sidebar-operator">
-              <p className="sidebar-subtitle">Operator tools</p>
-              <p className="muted-copy">
-                Installation-scoped AI controls apply across {installationLabel}.
-              </p>
-              <Link
-                className="text-link"
-                href={
-                  buildAiGatewayRoute(
-                    workspace.review.owner,
-                    workspace.review.repo,
-                    workspace.review.pull_number,
-                  ) as Route
-                }
-              >
-                Open LiteLLM settings
-              </Link>
-            </div>
-          </section>
+          {primaryOpenThread ? (
+            <OpenThreadRailCard
+              openThreadCount={openThreads.length}
+              thread={primaryOpenThread}
+            />
+          ) : null}
         </aside>
       </div>
+
+      <details className="summary-card workspace-utility-card">
+        <summary className="workspace-utility-summary">
+          <span>
+            <strong>Session &amp; review settings</strong>
+            <span className="history-caption notebook-jump-summary-copy">
+              Keep these nearby without interrupting the diff.
+            </span>
+          </span>
+          <span className="muted-copy">Open only if needed</span>
+        </summary>
+        <div className="workspace-utility-panel">
+          <p className="muted-copy">
+            Refresh access, sign out, or adjust installation-scoped AI settings for{" "}
+            {installationLabel}.
+          </p>
+          <div className="workspace-utility-actions">
+            <a className="secondary-button" href={buildLoginHref(currentPath)}>
+              Refresh access
+            </a>
+            <form action={buildWorkspaceActionPath("logout")} method="post">
+              <input name="returnTo" type="hidden" value={currentPath} />
+              <button className="ghost-button" type="submit">
+                Sign out
+              </button>
+            </form>
+            <Link
+              className="text-link"
+              href={
+                buildAiGatewayRoute(
+                  workspace.review.owner,
+                  workspace.review.repo,
+                  workspace.review.pull_number,
+                ) as Route
+              }
+            >
+              Open LiteLLM settings
+            </Link>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -360,6 +314,11 @@ type SnapshotOverviewProps = {
 
 
 function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
+  const reviewSignalCount =
+    snapshot.payload.review.notices.length +
+    snapshot.flagged_findings.length +
+    snapshot.reviewer_guidance.length;
+
   return (
     <section className="summary-card snapshot-overview-card">
       <div className="summary-head snapshot-overview-head">
@@ -379,6 +338,59 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
       </div>
       {snapshot.summary_text ? (
         <p className="summary-text snapshot-summary-text">{snapshot.summary_text}</p>
+      ) : null}
+      {reviewSignalCount > 0 ? (
+        <details className="snapshot-disclosure">
+          <summary>
+            <span>
+              Review notes
+              <span className="history-caption notebook-jump-summary-copy">
+                {reviewSignalCount} signal{reviewSignalCount === 1 ? "" : "s"}
+              </span>
+            </span>
+            <span className="muted-copy">Expand</span>
+          </summary>
+          <div className="snapshot-disclosure-panel">
+            {snapshot.payload.review.notices.length ? (
+              <div className="sidebar-subsection">
+                <p className="sidebar-subtitle">Heads up</p>
+                <ul className="chip-list">
+                  {snapshot.payload.review.notices.map((notice) => (
+                    <li className="chip-item" key={notice}>
+                      {notice}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {snapshot.flagged_findings.length ? (
+              <div className="sidebar-subsection">
+                <p className="sidebar-subtitle">Flagged findings</p>
+                <ul className="text-list">
+                  {snapshot.flagged_findings.map((finding, index) => (
+                    <li key={`${finding.code ?? "finding"}-${index}`}>
+                      {summarizeFinding(finding)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {snapshot.reviewer_guidance.length ? (
+              <div className="sidebar-subsection">
+                <p className="sidebar-subtitle">Reviewer guidance</p>
+                <ul className="text-list">
+                  {snapshot.reviewer_guidance.map((guidance, index) => (
+                    <li key={`${guidance.label ?? "guidance"}-${index}`}>
+                      {summarizeGuidance(guidance)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </details>
       ) : null}
       <details className="snapshot-disclosure">
         <summary>Snapshot details</summary>
@@ -439,9 +451,20 @@ function NotebookCard({
   onToggleComposer,
 }: NotebookCardProps) {
   const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
-  const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
+  const notebookThreads = getThreadsForNotebook(notebook, threadsByAnchor);
+  const threadCount = notebookThreads.length;
+  const openThreadCount = notebookThreads.filter((thread) => thread.status === "open").length;
+  const resolvedThreadCount = notebookThreads.filter((thread) => thread.status === "resolved").length;
+  const outdatedThreadCount = notebookThreads.filter((thread) => thread.status === "outdated").length;
   const visibleRows = notebook.render_rows.filter((row) => hasVisibleBlocks(row, threadsByAnchor));
   const notebookSectionId = buildNotebookSectionId(notebook.path);
+  const notebookSummaryLabel = buildNotebookSummaryLabel({
+    noticeCount: notebook.notices.length,
+    openThreadCount,
+    resolvedThreadCount,
+    outdatedThreadCount,
+    totalThreadCount: threadCount,
+  });
 
   return (
     <section className="notebook-card notebook-card-flat" id={notebookSectionId}>
@@ -468,14 +491,52 @@ function NotebookCard({
         </div>
       </div>
 
-      {notebook.notices.length ? (
-        <ul className="chip-list">
-          {notebook.notices.map((notice) => (
-            <li className="chip-item" key={notice}>
-              {notice}
-            </li>
-          ))}
-        </ul>
+      {notebookSummaryLabel ? (
+        <details className="notebook-summary-card">
+          <summary className="notebook-summary-toggle">
+            <span>
+              <strong>Notebook summary</strong>
+              <span className="history-caption notebook-jump-summary-copy">
+                {notebookSummaryLabel}
+              </span>
+            </span>
+            <span className="muted-copy">Expand</span>
+          </summary>
+          <div className="notebook-summary-panel">
+            {notebook.notices.length ? (
+              <div className="notebook-summary-section">
+                <p className="sidebar-subtitle">Notebook notes</p>
+                <ul className="chip-list">
+                  {notebook.notices.map((notice) => (
+                    <li className="chip-item" key={notice}>
+                      {notice}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {threadCount ? (
+              <div className="notebook-summary-section">
+                <p className="sidebar-subtitle">Thread status</p>
+                <div className="notebook-thread-stats">
+                  <div className="notebook-stat">
+                    <span className="summary-label">Open</span>
+                    <strong>{openThreadCount}</strong>
+                  </div>
+                  <div className="notebook-stat">
+                    <span className="summary-label">Resolved</span>
+                    <strong>{resolvedThreadCount}</strong>
+                  </div>
+                  <div className="notebook-stat">
+                    <span className="summary-label">Outdated</span>
+                    <strong>{outdatedThreadCount}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </details>
       ) : null}
 
       <div className="row-stack">
@@ -493,6 +554,42 @@ function NotebookCard({
           />
         ))}
       </div>
+    </section>
+  );
+}
+
+
+function OpenThreadRailCard({
+  thread,
+  openThreadCount,
+}: {
+  thread: ReviewThread;
+  openThreadCount: number;
+}) {
+  const [directoryLabel, fileLabel] = splitNotebookPath(thread.anchor.notebook_path);
+
+  return (
+    <section className="side-card side-card-compact">
+      <div className="sidebar-rail-head">
+        <h2>{openThreadCount === 1 ? "Open thread" : "Open threads"}</h2>
+        <StatusPill label={`${openThreadCount} open`} tone="accent" />
+      </div>
+      <p className="muted-copy side-card-copy">
+        {openThreadCount === 1
+          ? "Jump back into the active discussion without scanning the full diff."
+          : "Showing one active discussion so the rail stays compact."}
+      </p>
+      <a
+        className="history-link rail-thread-link"
+        href={`#${buildNotebookSectionId(thread.anchor.notebook_path)}`}
+      >
+        <span className="notebook-jump-copy">
+          <strong>{fileLabel}</strong>
+          <span className="history-caption">{directoryLabel}</span>
+        </span>
+        <span className="history-caption">{formatThreadAnchorSummary(thread.anchor)}</span>
+      </a>
+      <p className="thread-preview rail-thread-preview">{summarizeThreadPreview(thread)}</p>
     </section>
   );
 }
@@ -1139,18 +1236,30 @@ function countThreadsForNotebook(
   notebook: SnapshotNotebook,
   threadsByAnchor: Map<string, ReviewThread[]>,
 ): number {
+  return getThreadsForNotebook(notebook, threadsByAnchor).length;
+}
+
+
+function getThreadsForNotebook(
+  notebook: SnapshotNotebook,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): ReviewThread[] {
   const seen = new Set<string>();
+  const notebookThreads: ReviewThread[] = [];
 
   for (const row of notebook.render_rows) {
     for (const anchor of Object.values(row.thread_anchors)) {
       const threads = threadsByAnchor.get(buildAnchorKey(anchor)) ?? [];
       for (const thread of threads) {
-        seen.add(thread.id);
+        if (!seen.has(thread.id)) {
+          seen.add(thread.id);
+          notebookThreads.push(thread);
+        }
       }
     }
   }
 
-  return seen.size;
+  return notebookThreads;
 }
 
 
@@ -1167,4 +1276,52 @@ function buildThreadComposerId(anchor: ThreadAnchor): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")}`;
+}
+
+
+function buildNotebookSummaryLabel({
+  noticeCount,
+  openThreadCount,
+  resolvedThreadCount,
+  outdatedThreadCount,
+  totalThreadCount,
+}: {
+  noticeCount: number;
+  openThreadCount: number;
+  resolvedThreadCount: number;
+  outdatedThreadCount: number;
+  totalThreadCount: number;
+}): string | null {
+  const parts: string[] = [];
+
+  if (noticeCount > 0) {
+    parts.push(`${noticeCount} ${pluralize(noticeCount, "note")}`);
+  }
+  if (openThreadCount > 0) {
+    parts.push(`${openThreadCount} open ${pluralize(openThreadCount, "thread")}`);
+  }
+  if (resolvedThreadCount > 0) {
+    parts.push(`${resolvedThreadCount} resolved`);
+  }
+  if (outdatedThreadCount > 0) {
+    parts.push(`${outdatedThreadCount} outdated`);
+  }
+  if (parts.length === 0 && totalThreadCount > 0) {
+    parts.push(`${totalThreadCount} ${pluralize(totalThreadCount, "thread")}`);
+  }
+
+  return parts.length ? parts.join(" · ") : null;
+}
+
+
+function formatThreadAnchorSummary(anchor: ThreadAnchor): string {
+  const displayIndex = anchor.cell_locator.display_index;
+  const cellLabel = displayIndex === null ? "Notebook-level" : `Cell ${displayIndex}`;
+
+  return `${cellLabel} · ${blockTitle(anchor.block_kind)}`;
+}
+
+
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`;
 }

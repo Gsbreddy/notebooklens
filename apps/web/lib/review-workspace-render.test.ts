@@ -390,6 +390,57 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Two notebooks changed in this review version.");
   });
 
+  it("keeps the default rail focused and moves review signals into collapsible summaries", () => {
+    const row = buildRow({
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder",
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified",
+          },
+        ],
+      },
+    });
+    const notebook = buildNotebook("analysis/notebook.ipynb", row);
+    notebook.notices = ["Re-run this notebook after refreshing the staged fixture data."];
+    const workspace = buildWorkspaceFromNotebooks([notebook]);
+    workspace.snapshot!.payload.review.notices = ["Check the staged benchmark inputs before merging."];
+    workspace.snapshot!.flagged_findings = [
+      {
+        severity: "high",
+        summary: "Validation accuracy regressed in the benchmark output.",
+      },
+    ];
+    workspace.snapshot!.reviewer_guidance = [
+      {
+        label: "Regression triage",
+        prompt: "Confirm whether the metric drop is expected for this push.",
+      },
+    ];
+    workspace.threads = [buildThread(row)];
+
+    const markup = renderWorkspacePayload(workspace);
+
+    expect(markup).toContain("PR Versions");
+    expect(markup).toContain("Open thread");
+    expect(markup).not.toContain("Where to look first");
+    expect(markup).not.toContain("Review signals");
+    expect(markup).not.toContain("Workspace access");
+    expect(markup).toContain("Review notes");
+    expect(markup).toContain("Check the staged benchmark inputs before merging.");
+    expect(markup).toContain("Validation accuracy regressed in the benchmark output.");
+    expect(markup).toContain("Confirm whether the metric drop is expected for this push.");
+    expect(markup).toContain("Notebook summary");
+    expect(markup).toContain("Re-run this notebook after refreshing the staged fixture data.");
+    expect(markup).toContain("Session &amp; review settings");
+    expect(markup).toContain("Open LiteLLM settings");
+  });
+
   it("renders existing threads as collapsed summaries with compact GitHub metadata", () => {
     const row = buildRow({
       outputs: {
