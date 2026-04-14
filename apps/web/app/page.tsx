@@ -8,33 +8,41 @@ const REPOSITORY_URL = "https://github.com/notebooklens/notebooklens";
 export default function HomePage() {
   return (
     <main className="center-stage home-stage">
-      <section className="hero-card landing-hero landing-hero-compact">
-        <div className="hero-copy">
+      <section className="hero-card landing-hero landing-hero-priority">
+        <div className="hero-copy landing-hero-copy">
           <p className="eyebrow">NotebookLens Review Workspace</p>
-          <h1>Review notebook pull requests in one workspace instead of decoding raw <code>.ipynb</code> diffs.</h1>
+          <h1>
+            Review notebook pull requests at the exact cells, outputs, and
+            threads that changed.
+          </h1>
           <p className="hero-summary">
-            Open the GitHub check run and land on the latest push
-            with changed cells, outputs, and inline threads already anchored to
-            the parts reviewers need to inspect.
+            Sign in with GitHub and jump from the PR check run to the latest
+            push with notebook-aware context already anchored where reviewers
+            need to inspect.
           </p>
-          <p className="hero-subsummary landing-support-copy">
-            Need the full flow or a second proof point? Check the{" "}
+        </div>
+
+        <div className="landing-hero-panel">
+          <p className="eyebrow">Primary path</p>
+          <h2>Open the workspace with GitHub</h2>
+          <p className="muted-copy">
+            Use the GitHub account that already has access to the repository
+            and pull request.
+          </p>
+          <div className="hero-actions landing-actions landing-hero-actions">
+            <a className="primary-button" href={buildLoginHref("/")}>
+              Sign in with GitHub
+            </a>
+          </div>
+          <p className="hero-subsummary landing-hero-note">
+            Need to install the GitHub App first?{" "}
             <a
               className="landing-inline-link"
-              href={EXAMPLES_URL}
+              href={WORKSPACE_QUICKSTART_URL}
               rel="noreferrer"
               target="_blank"
             >
-              current examples
-            </a>{" "}
-            and{" "}
-            <a
-              className="landing-inline-link"
-              href={REPOSITORY_URL}
-              rel="noreferrer"
-              target="_blank"
-            >
-              repository docs
+              Open workspace quick start
             </a>
             .
           </p>
@@ -45,11 +53,11 @@ export default function HomePage() {
         <article className="summary-card landing-proof-card">
           <div className="summary-head">
             <div>
-              <p className="eyebrow">Proof</p>
+              <p className="eyebrow">After sign-in</p>
               <h2>What reviewers actually open</h2>
               <p className="summary-text">
                 A compact view of the current GitHub check run plus the
-                notebook-aware workspace it opens.
+                notebook-aware workspace it opens on the latest push.
               </p>
             </div>
           </div>
@@ -102,36 +110,43 @@ export default function HomePage() {
           </div>
         </article>
 
-        <div className="landing-path-stack">
-          <article className="summary-card landing-path-card">
-            <p className="eyebrow">Install path</p>
-            <h2>Set up the GitHub App review flow</h2>
-            <p className="muted-copy">
-              Use the current workspace quick start to install the app, open a
-              notebook PR, and launch the check run.
-            </p>
+        <article className="summary-card landing-support-card">
+          <p className="eyebrow">Need setup first?</p>
+          <h2>Install the GitHub App review flow</h2>
+          <p className="muted-copy">
+            Use the quick start to install the app, open a notebook pull
+            request, and launch the review workspace check run.
+          </p>
+          <a
+            className="secondary-button"
+            href={WORKSPACE_QUICKSTART_URL}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open workspace quick start
+          </a>
+          <p className="hero-subsummary landing-support-copy">
+            Need the full flow or a second proof point? Check the{" "}
             <a
-              className="primary-button"
-              href={WORKSPACE_QUICKSTART_URL}
+              className="landing-inline-link"
+              href={EXAMPLES_URL}
               rel="noreferrer"
               target="_blank"
             >
-              Open workspace quick start
+              current examples
+            </a>{" "}
+            and{" "}
+            <a
+              className="landing-inline-link"
+              href={REPOSITORY_URL}
+              rel="noreferrer"
+              target="_blank"
+            >
+              repository docs
             </a>
-          </article>
-
-          <article className="summary-card landing-path-card">
-            <p className="eyebrow">Sign-in path</p>
-            <h2>Open the workspace with GitHub</h2>
-            <p className="muted-copy">
-              Sign in with the GitHub account that already has access to the
-              repository and pull request.
-            </p>
-            <a className="secondary-button" href={buildLoginHref("/")}>
-              Sign in with GitHub
-            </a>
-          </article>
-        </div>
+            .
+          </p>
+        </article>
       </section>
     </main>
   );
