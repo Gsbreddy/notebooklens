@@ -13,7 +13,11 @@ import {
   buildWorkspaceActionPath,
   canStartThread,
   formatCellLabel,
+  getMeaningfulOutputItems,
+  getVisibleBlockKinds,
   groupThreadsByAnchor,
+  hasMeaningfulBlockContent,
+  hasVisibleBlocks,
   isBlockChanged,
   summarizeGitHubMirrorStatus,
   summarizeFinding,
@@ -45,6 +49,13 @@ export function ReviewWorkspace({
 }: ReviewWorkspaceProps) {
   const snapshot = workspace.snapshot;
   const threadsByAnchor = groupThreadsByAnchor(workspace.threads);
+  const visibleNotebooks = snapshot?.status === "ready"
+    ? snapshot.payload.review.notebooks.filter(
+        (notebook) =>
+          notebook.notices.length > 0 ||
+          notebook.render_rows.some((row) => hasVisibleBlocks(row, threadsByAnchor)),
+      )
+    : [];
   const latestSnapshotLabel =
     workspace.review.latest_snapshot_index === null
       ? "No snapshot"
@@ -139,9 +150,9 @@ export function ReviewWorkspace({
           ) : null}
 
           {snapshot?.status === "ready" &&
-          snapshot.payload.review.notebooks.length > 0 ? (
+          visibleNotebooks.length > 0 ? (
             <section className="notebook-stack">
-              {snapshot.payload.review.notebooks.map((notebook) => (
+              {visibleNotebooks.map((notebook) => (
                 <NotebookCard
                   currentPath={currentPath}
                   key={`${notebook.path}-${snapshot.id}`}
@@ -156,7 +167,7 @@ export function ReviewWorkspace({
           ) : null}
 
           {snapshot?.status === "ready" &&
-          snapshot.payload.review.notebooks.length === 0 ? (
+          visibleNotebooks.length === 0 ? (
             <EmptyState
               title="No notebook diffs in this snapshot"
               description="NotebookLens did not persist any notebook-aware render rows for the selected revision."
@@ -337,6 +348,7 @@ function NotebookCard({
 }: NotebookCardProps) {
   const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
   const threadCount = countThreadsForNotebook(notebook, threadsByAnchor);
+  const visibleRows = notebook.render_rows.filter((row) => hasVisibleBlocks(row, threadsByAnchor));
 
   return (
     <section className="notebook-card">
@@ -352,7 +364,7 @@ function NotebookCard({
       <div className="notebook-stats">
         <div className="notebook-stat">
           <span className="summary-label">Changed rows</span>
-          <strong>{notebook.render_rows.length}</strong>
+          <strong>{visibleRows.length}</strong>
         </div>
         <div className="notebook-stat">
           <span className="summary-label">Inline threads</span>
@@ -375,7 +387,7 @@ function NotebookCard({
       ) : null}
 
       <div className="row-stack">
-        {notebook.render_rows.map((row) => (
+        {visibleRows.map((row) => (
           <CellRowCard
             currentPath={currentPath}
             key={`${notebook.path}-${buildAnchorKey(row.thread_anchors.source)}`}
@@ -413,11 +425,7 @@ function CellRowCard({
   threadsByAnchor,
   currentPath,
 }: CellRowCardProps) {
-  const blocks: SnapshotBlockKind[] = ["source", "outputs", "metadata"].filter(
-    (blockKind) =>
-      isBlockChanged(row, blockKind as SnapshotBlockKind) ||
-      (threadsByAnchor.get(buildAnchorKey(row.thread_anchors[blockKind as SnapshotBlockKind]))?.length ?? 0) > 0,
-  ) as SnapshotBlockKind[];
+  const blocks = getVisibleBlockKinds(row, threadsByAnchor);
   const changedBlockCount = blocks.filter((blockKind) => isBlockChanged(row, blockKind)).length;
 
   return (
@@ -501,6 +509,10 @@ function BlockContent({
   blockKind: SnapshotBlockKind;
   row: RenderRow;
 }) {
+  if (!hasMeaningfulBlockContent(row, blockKind)) {
+    return null;
+  }
+
   if (blockKind === "source") {
     return (
       <div className="code-grid">
@@ -511,41 +523,39 @@ function BlockContent({
   }
 
   if (blockKind === "outputs") {
+    const outputItems = getMeaningfulOutputItems(row);
+
     return (
       <div className="output-list">
-        {row.outputs.items.length ? (
-          row.outputs.items.map((item, index) => (
-            item.kind === "image" ? (
-              <ImageOutputCard item={item} key={`${item.asset_id}-${index}`} />
-            ) : (
-              <article className="output-card" key={`${item.output_type}-${index}`}>
-                <div className="output-head">
-                  <strong>{item.output_type}</strong>
-                  <div className="output-meta">
-                    <span>{item.mime_group}</span>
-                    <StatusPill
-                      label={item.change_type}
-                      tone={outputChangeTone(item.change_type)}
-                    />
-                  </div>
+        {outputItems.map((item, index) => (
+          item.kind === "image" ? (
+            <ImageOutputCard item={item} key={`${item.asset_id}-${index}`} />
+          ) : (
+            <article className="output-card" key={`${item.output_type}-${index}`}>
+              <div className="output-head">
+                <strong>{item.output_type}</strong>
+                <div className="output-meta">
+                  <span>{item.mime_group}</span>
+                  <StatusPill
+                    label={item.change_type}
+                    tone={outputChangeTone(item.change_type)}
+                  />
                 </div>
-                <p>{item.summary}</p>
-                {item.truncated ? (
-                  <span className="muted-copy">Output summary truncated</span>
-                ) : null}
-              </article>
-            )
-          ))
-        ) : (
-          <p className="muted-copy">No output summaries were captured for this block.</p>
-        )}
+              </div>
+              <p>{item.summary}</p>
+              {item.truncated ? (
+                <span className="muted-copy">Output summary truncated</span>
+              ) : null}
+            </article>
+          )
+        ))}
       </div>
     );
   }
 
   return (
     <div className="metadata-card">
-      <p>{row.metadata.summary ?? "Notebook metadata changed."}</p>
+      <p>{row.metadata.summary}</p>
     </div>
   );
 }
@@ -623,38 +633,42 @@ function ThreadColumn({
   return (
     <div className="thread-column">
       <div className="thread-column-head">
-        <h5>Inline threads</h5>
-        <p className="muted-copy">
-          Keep discussion attached to this diff block across snapshot history.
-        </p>
+        <div>
+          <h5>Inline threads</h5>
+          <p className="muted-copy">
+            Keep discussion attached to this diff block across snapshot history.
+          </p>
+        </div>
       </div>
 
       {threadable ? (
-        <details className="thread-composer">
-          <summary>Start a thread</summary>
-          <form
-            action={buildWorkspaceActionPath("create-thread")}
-            className="thread-form"
-            method="post"
-          >
-            <input name="returnTo" type="hidden" value={currentPath} />
-            <input name="reviewId" type="hidden" value={reviewId} />
-            <input name="snapshotId" type="hidden" value={snapshotId} />
-            <input name="anchorJson" type="hidden" value={JSON.stringify(anchor)} />
-            <label>
-              Message
-              <textarea
-                name="bodyMarkdown"
-                placeholder="Explain the regression, ask for notebook updates, or capture follow-up context."
-                required
-                rows={4}
-              />
-            </label>
+        <form
+          action={buildWorkspaceActionPath("create-thread")}
+          className="thread-form thread-form-inline"
+          method="post"
+        >
+          <input name="returnTo" type="hidden" value={currentPath} />
+          <input name="reviewId" type="hidden" value={reviewId} />
+          <input name="snapshotId" type="hidden" value={snapshotId} />
+          <input name="anchorJson" type="hidden" value={JSON.stringify(anchor)} />
+          <label className="thread-form-compact-label">
+            <span>Start a thread</span>
+            <textarea
+              name="bodyMarkdown"
+              placeholder="Ask for context, call out a regression, or note the follow-up you want here."
+              required
+              rows={3}
+            />
+          </label>
+          <div className="thread-form-actions">
+            <p className="muted-copy">
+              Threads stay anchored to this block and can carry forward with later snapshots.
+            </p>
             <button className="primary-button" type="submit">
               Create thread
             </button>
-          </form>
-        </details>
+          </div>
+        </form>
       ) : (
         <p className="muted-copy">
           New threads can only be created on changed blocks in the latest ready snapshot.

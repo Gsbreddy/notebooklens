@@ -611,7 +611,7 @@ pre {
 
 .thread-column {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   margin-top: 20px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
@@ -619,6 +619,10 @@ pre {
 
 .thread-column-head h5 {
   font-size: 1.02rem;
+}
+
+.thread-column-head p {
+  margin: 8px 0 0;
 }
 
 .thread-heading-copy {
@@ -636,7 +640,6 @@ pre {
 .thread-form {
   display: grid;
   gap: 12px;
-  margin-top: 12px;
 }
 
 .thread-form label {
@@ -660,6 +663,36 @@ pre {
 .settings-form textarea {
   min-height: 110px;
   resize: vertical;
+}
+
+.thread-form-inline {
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(247, 217, 197, 0.28));
+}
+
+.thread-form-inline textarea {
+  min-height: 88px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.thread-form-compact-label > span {
+  font-size: 0.92rem;
+}
+
+.thread-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.thread-form-actions .muted-copy {
+  margin: 0;
+  flex: 1 1 280px;
 }
 
 .thread-composer summary,

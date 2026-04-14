@@ -3,6 +3,7 @@ import type {
   RenderRow,
   ReviewSnapshotRecord,
   ReviewThread,
+  SnapshotBlockKind,
   ThreadAnchor,
   WorkspaceReview,
 } from "@/lib/types";
@@ -56,7 +57,55 @@ export function canStartThread(
   if (review.latest_snapshot_id !== snapshot.id) {
     return false;
   }
+  if (!hasMeaningfulBlockContent(row, blockKind)) {
+    return false;
+  }
   return isBlockChanged(row, blockKind);
+}
+
+
+export function hasMeaningfulBlockContent(
+  row: RenderRow,
+  blockKind: SnapshotBlockKind,
+): boolean {
+  if (blockKind === "source") {
+    return hasMeaningfulText(row.source.base) || hasMeaningfulText(row.source.head);
+  }
+  if (blockKind === "outputs") {
+    return row.outputs.items.some((item) => item.kind === "image" || hasMeaningfulText(item.summary));
+  }
+  return hasMeaningfulText(row.metadata.summary);
+}
+
+
+export function getVisibleBlockKinds(
+  row: RenderRow,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): SnapshotBlockKind[] {
+  return (["source", "outputs", "metadata"] as const).filter((blockKind) => {
+    const hasThreads = (threadsByAnchor.get(buildAnchorKey(row.thread_anchors[blockKind]))?.length ?? 0) > 0;
+    if (hasThreads) {
+      return true;
+    }
+    return isBlockChanged(row, blockKind) && hasMeaningfulBlockContent(row, blockKind);
+  });
+}
+
+
+export function hasVisibleBlocks(
+  row: RenderRow,
+  threadsByAnchor: Map<string, ReviewThread[]>,
+): boolean {
+  return getVisibleBlockKinds(row, threadsByAnchor).length > 0;
+}
+
+
+export function getMeaningfulOutputItems(
+  row: RenderRow,
+): RenderRow["outputs"]["items"] {
+  return row.outputs.items.filter((item) =>
+    item.kind === "image" || hasMeaningfulText(item.summary),
+  );
 }
 
 
@@ -235,4 +284,9 @@ function firstValue(value: string | string[] | undefined): string | null {
     return value[0] ?? null;
   }
   return value ?? null;
+}
+
+
+function hasMeaningfulText(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0;
 }

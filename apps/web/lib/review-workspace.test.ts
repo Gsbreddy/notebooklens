@@ -6,7 +6,11 @@ import {
   buildFlashRedirect,
   buildWorkspaceActionPath,
   canStartThread,
+  getMeaningfulOutputItems,
+  getVisibleBlockKinds,
   groupThreadsByAnchor,
+  hasMeaningfulBlockContent,
+  hasVisibleBlocks,
   isBlockChanged,
   summarizeGitHubMirrorStatus,
 } from "@/lib/review-workspace";
@@ -161,13 +165,29 @@ describe("review workspace helpers", () => {
   });
 
   it("only allows new threads on changed blocks in the latest ready snapshot", () => {
-    const row = buildRow();
+    const row = {
+      ...buildRow(),
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder" as const,
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+        ],
+      },
+    };
     const latestSnapshot = buildSnapshot("snapshot-2");
     const oldSnapshot = buildSnapshot("snapshot-1");
 
     expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, row, "outputs")).toBe(true);
     expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, row, "source")).toBe(false);
     expect(canStartThread(buildReview("snapshot-2"), oldSnapshot, row, "outputs")).toBe(false);
+    expect(canStartThread(buildReview("snapshot-2"), latestSnapshot, buildRow(), "outputs")).toBe(false);
   });
 
   it("keeps flash redirects on the same route", () => {
@@ -184,6 +204,62 @@ describe("review workspace helpers", () => {
 
     expect(isBlockChanged(row, "outputs")).toBe(true);
     expect(isBlockChanged(row, "metadata")).toBe(false);
+  });
+
+  it("treats empty metadata and output blocks as not meaningful", () => {
+    const row = buildRow();
+
+    expect(hasMeaningfulBlockContent(row, "outputs")).toBe(false);
+    expect(hasMeaningfulBlockContent(row, "metadata")).toBe(false);
+    expect(hasMeaningfulBlockContent(row, "source")).toBe(true);
+  });
+
+  it("suppresses empty changed blocks when they have no threads", () => {
+    const row = buildRow();
+
+    expect(getVisibleBlockKinds(row, new Map())).toEqual([]);
+    expect(hasVisibleBlocks(row, new Map())).toBe(false);
+  });
+
+  it("keeps thread-only blocks visible even when the diff content is empty", () => {
+    const row = buildRow();
+    const thread = {
+      ...buildThread(row),
+      anchor: row.thread_anchors.outputs,
+    };
+    const threadsByAnchor = groupThreadsByAnchor([thread]);
+
+    expect(getVisibleBlockKinds(row, threadsByAnchor)).toEqual(["outputs"]);
+    expect(hasVisibleBlocks(row, threadsByAnchor)).toBe(true);
+  });
+
+  it("filters empty output placeholder cards out of a visible block", () => {
+    const row = {
+      ...buildRow(),
+      outputs: {
+        changed: true,
+        items: [
+          {
+            kind: "placeholder" as const,
+            output_type: "execute_result",
+            mime_group: "text",
+            summary: "   ",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+          {
+            kind: "placeholder" as const,
+            output_type: "stream",
+            mime_group: "text",
+            summary: "Accuracy dropped from 0.92 to 0.88.",
+            truncated: false,
+            change_type: "modified" as const,
+          },
+        ],
+      },
+    };
+
+    expect(getMeaningfulOutputItems(row)).toEqual([row.outputs.items[1]]);
   });
 
   it("builds the review-scoped LiteLLM settings route", () => {
