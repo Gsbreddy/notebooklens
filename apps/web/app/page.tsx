@@ -38,12 +38,11 @@ export default async function HomePage({ searchParams }: PageProps) {
   const primaryLabel = isReturningFromInstall
     ? "Open workspace quick start"
     : "Continue with GitHub";
-  const primaryTitle = isReturningFromInstall
-    ? "Finish opening the review flow"
-    : "Open the workspace with GitHub";
+  const primaryTitle =
+    "Open changed cells, outputs, and inline comments";
   const primaryCopy = isReturningFromInstall
-    ? "NotebookLens already received your GitHub App setup handoff. Continue with the quick start to open a notebook pull request and launch the review workspace check run."
-    : "Start with the GitHub account that already has access to the repository and pull request.";
+    ? "Use the workspace quick start to open a notebook pull request review with changed cells, rendered outputs, and inline comments already in view."
+    : "Continue with GitHub to open notebook pull request reviews with changed cells, rendered outputs, and inline comments already in view.";
 
   return (
     <main className="center-stage home-stage">
@@ -51,13 +50,12 @@ export default async function HomePage({ searchParams }: PageProps) {
         <div className="hero-copy landing-hero-copy">
           <p className="eyebrow">NotebookLens Review Workspace</p>
           <h1>
-            Review notebook pull requests at the exact cells, outputs, and
-            threads that changed.
+            Review notebook pull requests at changed cells, outputs, and
+            inline comments.
           </h1>
           <p className="hero-summary">
-            Sign in with GitHub and jump from the PR check run to the latest
-            push with notebook-aware context already anchored where reviewers
-            need to inspect.
+            Open changed cells, outputs, and inline comments for the notebook
+            pull request you need to review.
           </p>
         </div>
 
@@ -142,8 +140,8 @@ export default async function HomePage({ searchParams }: PageProps) {
                   Illustration only
                 </span>
                 <span className="landing-proof-banner-copy">
-                  Static preview of the GitHub check run opening the latest
-                  notebook-aware review workspace.
+                  Static preview of the latest notebook review workspace with
+                  changed cells, outputs, and inline comments in view.
                 </span>
               </figcaption>
 
@@ -155,7 +153,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                   </span>
                 </div>
                 <p className="landing-checkrun-copy">
-                  1 open thread · 0 resolved · GitHub handoff to workspace
+                  changed cells ready · outputs in view · 1 inline comment
                 </p>
               </div>
 
@@ -189,11 +187,11 @@ export default async function HomePage({ searchParams }: PageProps) {
                 <ul className="landing-list landing-proof-list">
                   <li>Changed notebook output stays visible inside the review.</li>
                   <li>Latest push context stays attached before replying on the PR.</li>
-                  <li>Inline discussion stays anchored to the exact changed block.</li>
+                  <li>Inline comments stay anchored to the exact changed block.</li>
                 </ul>
 
                 <div className="landing-proof-thread">
-                  <span className="summary-label">Example thread</span>
+                  <span className="summary-label">Example inline comment</span>
                   <strong>
                     Explain whether the widened confidence band is expected.
                   </strong>

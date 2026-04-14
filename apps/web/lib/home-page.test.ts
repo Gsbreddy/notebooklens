@@ -28,6 +28,12 @@ describe("HomePage", () => {
     expect(html).toContain("Next step");
     expect(html).toContain("Continue with GitHub");
     expect(html).toContain(
+      "Open changed cells, outputs, and inline comments",
+    );
+    expect(html).toContain(
+      "Open changed cells, outputs, and inline comments for the notebook pull request you need to review.",
+    );
+    expect(html).toContain(
       'href="/api/auth/github/login?next_path=%2F"',
     );
     expect(primaryButtons).toHaveLength(1);
@@ -47,8 +53,10 @@ describe("HomePage", () => {
       setup_action: "install",
     });
 
-    expect(html).toContain("Finish opening the review flow");
-    expect(html).toContain("NotebookLens already received your GitHub App setup handoff.");
+    expect(html).toContain("Open changed cells, outputs, and inline comments");
+    expect(html).toContain(
+      "Use the workspace quick start to open a notebook pull request review with changed cells, rendered outputs, and inline comments already in view.",
+    );
     expect(html).toContain(`href="${WORKSPACE_QUICKSTART_URL}"`);
     expect(html).toContain("Open workspace quick start");
     expect(html).not.toContain(
@@ -60,8 +68,8 @@ describe("HomePage", () => {
     const html = await renderHomePage();
 
     expect(html).toContain("Illustration only");
-    expect(html).toContain("Static preview of the GitHub check run");
-    expect(html).toContain("Example thread");
+    expect(html).toContain("Static preview of the latest notebook review workspace");
+    expect(html).toContain("Example inline comment");
     expect(html).not.toContain("Open thread");
   });
 });

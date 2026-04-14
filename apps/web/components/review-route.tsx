@@ -104,8 +104,8 @@ function AuthWall({
               <span className="status-pill tone-default">Direct review link</span>
             </div>
             <p className="workspace-strip-caption workspace-strip-caption-inline">
-              NotebookLens returns to this exact review route immediately after GitHub
-              access is confirmed.
+              This link returns to the same PR review with changed cells,
+              outputs, and inline comments in focus.
             </p>
           </div>
         </header>
@@ -116,12 +116,13 @@ function AuthWall({
               <div className="review-entry-banner-copy">
                 <p className="eyebrow">Open the review</p>
                 <h2 className="review-entry-title">
-                  Continue straight into changed cells, outputs, and threads
+                  Open changed cells, outputs, and inline comments for this PR.
                 </h2>
                 <p className="hero-summary review-entry-summary">
-                  This direct link already targets {reviewContext}. Sign in with GitHub
-                  once and NotebookLens brings you back to the review surface instead of
-                  a generic setup page.
+                  This direct link already targets {reviewContext}. Continue
+                  with GitHub and NotebookLens brings you back to the notebook
+                  review surface with the changed cells, outputs, and inline
+                  comments already in context.
                 </p>
               </div>
               <div className="review-entry-actions">
@@ -138,16 +139,17 @@ function AuthWall({
               <div className="notebook-head review-entry-preview-head">
                 <div>
                   <p className="eyebrow">Review surface</p>
-                  <h2>Changed cells stay front and center</h2>
+                  <h2>Changed cells, outputs, and inline comments stay front and center</h2>
                   <p className="hero-summary review-entry-summary">
-                    PR context stays visible here so the next step still feels like
-                    entering the notebook review, not setting it up.
+                    PR context stays visible here so the next step opens the
+                    review itself, with notebook changes and comments already
+                    connected to this pull request.
                   </p>
                 </div>
                 <div className="hero-meta">
                   <span className="status-pill tone-accent">Changed cells</span>
                   <span className="status-pill tone-default">Outputs</span>
-                  <span className="status-pill tone-default">Threads</span>
+                  <span className="status-pill tone-default">Inline comments</span>
                 </div>
               </div>
 
@@ -169,11 +171,11 @@ function AuthWall({
                   </p>
                 </article>
                 <article className="review-entry-preview-panel">
-                  <p className="summary-label">Discussion threads</p>
-                  <h3>Comments reconnect to the notebook.</h3>
+                  <p className="summary-label">Inline comments</p>
+                  <h3>Comments stay attached to the notebook.</h3>
                   <p className="muted-copy">
-                    Open threads return as anchored review items instead of a separate
-                    destination to rediscover.
+                    Inline comments return as anchored review items instead of
+                    a separate destination to rediscover.
                   </p>
                 </article>
               </div>
@@ -185,8 +187,8 @@ function AuthWall({
               <p className="eyebrow">Direct review link</p>
               <h2>{reviewContext}</h2>
               <p className="muted-copy">
-                NotebookLens only pauses here long enough to verify GitHub access for
-                this pull request, then returns you to the same review route.
+                GitHub verification returns you to this same PR review with
+                changed cells, outputs, and inline comments still in focus.
               </p>
               <div className="review-entry-sidegrid">
                 <div className="summary-metric review-entry-metric">
@@ -195,7 +197,7 @@ function AuthWall({
                 </div>
                 <div className="summary-metric review-entry-metric">
                   <span className="summary-label">Review focus</span>
-                  <strong>Cells, outputs, and threads</strong>
+                  <strong>Cells, outputs, and inline comments</strong>
                 </div>
               </div>
             </section>

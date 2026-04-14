@@ -93,10 +93,13 @@ describe("ReviewRoute", () => {
     expect(html).toContain("NotebookLens review workspace");
     expect(html).toContain("Sign-in required");
     expect(html).toContain(
-      "Continue straight into changed cells, outputs, and threads",
+      "Open changed cells, outputs, and inline comments for this PR.",
     );
-    expect(html).toContain("Changed cells stay front and center");
+    expect(html).toContain(
+      "Changed cells, outputs, and inline comments stay front and center",
+    );
     expect(html).toContain("Continue to octo-org/notebooklens · PR #7");
+    expect(html).toContain("Cells, outputs, and inline comments");
     expect(html).not.toContain(
       "Use the GitHub account that can already open octo-org/notebooklens.",
     );
