@@ -4,6 +4,7 @@ import {
   buildAnchorKey,
   buildAiGatewayRoute,
   buildFlashRedirect,
+  buildWorkspaceActionPath,
   canStartThread,
   groupThreadsByAnchor,
   isBlockChanged,
@@ -189,6 +190,14 @@ describe("review workspace helpers", () => {
     expect(buildAiGatewayRoute("octo", "notebooklens", 7)).toBe(
       "/reviews/octo/notebooklens/pulls/7/settings/ai-gateway",
     );
+  });
+
+  it("builds stable post routes for review mutations", () => {
+    expect(buildWorkspaceActionPath("create-thread")).toBe("/actions/threads/create");
+    expect(buildWorkspaceActionPath("reply-thread")).toBe("/actions/threads/reply");
+    expect(buildWorkspaceActionPath("resolve-thread")).toBe("/actions/threads/resolve");
+    expect(buildWorkspaceActionPath("reopen-thread")).toBe("/actions/threads/reopen");
+    expect(buildWorkspaceActionPath("logout")).toBe("/actions/auth/logout");
   });
 
   it("summarizes mirrored GitHub threads", () => {

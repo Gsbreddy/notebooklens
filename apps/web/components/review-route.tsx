@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ApiRequestError, buildLoginHref, getReviewWorkspace, getSnapshotWorkspace } from "@/lib/api";
@@ -52,16 +53,27 @@ export async function ReviewRoute(props: ReviewRouteProps) {
 function AuthWall({ currentPath }: { currentPath: string }) {
   return (
     <main className="center-stage">
-      <section className="hero-card compact-card">
+      <section className="hero-card compact-card wall-card">
         <p className="eyebrow">Managed Review Access</p>
         <h1>Sign in with GitHub to open this review workspace</h1>
         <p className="hero-summary">
-          NotebookLens checks repository visibility with your GitHub OAuth session
-          before it loads snapshot history or inline thread data.
+          NotebookLens checks repository visibility with your GitHub OAuth
+          session before it loads snapshot history, rendered outputs, or inline
+          discussion threads.
         </p>
-        <a className="primary-button" href={buildLoginHref(currentPath)}>
-          Continue with GitHub
-        </a>
+        <ul className="wall-list">
+          <li>Make sure the NotebookLens GitHub App is installed on this repository.</li>
+          <li>Open the review route from a GitHub check run when possible.</li>
+          <li>Use the same GitHub account that can already view the pull request.</li>
+        </ul>
+        <div className="wall-actions">
+          <a className="primary-button" href={buildLoginHref(currentPath)}>
+            Continue with GitHub
+          </a>
+          <Link className="secondary-button" href="/">
+            Back to home
+          </Link>
+        </div>
       </section>
     </main>
   );
@@ -71,10 +83,20 @@ function AuthWall({ currentPath }: { currentPath: string }) {
 function ErrorWall({ detail }: { detail: string }) {
   return (
     <main className="center-stage">
-      <section className="hero-card compact-card">
+      <section className="hero-card compact-card wall-card">
         <p className="eyebrow">Workspace Error</p>
         <h1>NotebookLens could not load this review</h1>
         <p className="hero-summary">{detail}</p>
+        <ul className="wall-list">
+          <li>Confirm the workspace check run finished for the latest PR push.</li>
+          <li>Make sure your GitHub session still has access to the repository.</li>
+          <li>Retry from the pull request after refreshing your NotebookLens access.</li>
+        </ul>
+        <div className="wall-actions">
+          <Link className="secondary-button" href="/">
+            Return home
+          </Link>
+        </div>
       </section>
     </main>
   );

@@ -96,6 +96,24 @@ export function buildAiGatewayRoute(
 }
 
 
+export function buildWorkspaceActionPath(
+  action: "create-thread" | "reply-thread" | "resolve-thread" | "reopen-thread" | "logout",
+): string {
+  switch (action) {
+    case "create-thread":
+      return "/actions/threads/create";
+    case "reply-thread":
+      return "/actions/threads/reply";
+    case "resolve-thread":
+      return "/actions/threads/resolve";
+    case "reopen-thread":
+      return "/actions/threads/reopen";
+    case "logout":
+      return "/actions/auth/logout";
+  }
+}
+
+
 export function buildFlashRedirect(
   returnTo: string,
   notice: FlashNotice,

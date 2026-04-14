@@ -3,13 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 import {
-  createThreadAction,
-  logoutAction,
-  reopenThreadAction,
-  replyToThreadAction,
-  resolveThreadAction,
-} from "@/lib/actions";
-import {
   buildApiHref,
   buildLoginHref,
 } from "@/lib/api";
@@ -17,6 +10,7 @@ import {
   buildAnchorKey,
   buildAiGatewayRoute,
   buildSnapshotRoute,
+  buildWorkspaceActionPath,
   canStartThread,
   formatCellLabel,
   groupThreadsByAnchor,
@@ -66,6 +60,11 @@ export function ReviewWorkspace({
             revisions, and keep discussion anchored to specific changed notebook
             blocks.
           </p>
+          <p className="hero-subsummary">
+            Beta workspace features are live here first. Use this surface to read
+            notebook-aware diffs, track carried-forward discussion, and confirm what
+            NotebookLens mirrored back to GitHub.
+          </p>
           <div className="hero-meta">
             <StatusPill label={`Review ${workspace.review.status}`} tone="default" />
             <StatusPill
@@ -98,7 +97,7 @@ export function ReviewWorkspace({
           <a className="secondary-button" href={buildLoginHref(currentPath)}>
             Refresh access
           </a>
-          <form action={logoutAction}>
+          <form action={buildWorkspaceActionPath("logout")} method="post">
             <input name="returnTo" type="hidden" value={currentPath} />
             <button className="ghost-button" type="submit">
               Sign out
@@ -158,6 +157,15 @@ export function ReviewWorkspace({
         </main>
 
         <aside className="workspace-sidebar">
+          <section className="side-card">
+            <h2>Workspace Quick Tips</h2>
+            <ul className="text-list">
+              <li>Open threads on changed blocks in the latest ready snapshot.</li>
+              <li>Use snapshot history to confirm whether open threads were carried forward.</li>
+              <li>Mirror status shows whether GitHub reviewers can continue in the native PR thread.</li>
+            </ul>
+          </section>
+
           <section className="side-card">
             <h2>Snapshot History</h2>
             <div className="history-list">
@@ -586,7 +594,11 @@ function ThreadColumn({
       {threadable ? (
         <details className="thread-composer">
           <summary>Start a thread</summary>
-          <form action={createThreadAction} className="thread-form">
+          <form
+            action={buildWorkspaceActionPath("create-thread")}
+            className="thread-form"
+            method="post"
+          >
             <input name="returnTo" type="hidden" value={currentPath} />
             <input name="reviewId" type="hidden" value={reviewId} />
             <input name="snapshotId" type="hidden" value={snapshotId} />
@@ -696,7 +708,11 @@ function ThreadCard({
       <div className="thread-actions">
         <details className="reply-details">
           <summary>Reply</summary>
-          <form action={replyToThreadAction} className="thread-form">
+          <form
+            action={buildWorkspaceActionPath("reply-thread")}
+            className="thread-form"
+            method="post"
+          >
             <input name="returnTo" type="hidden" value={currentPath} />
             <input name="threadId" type="hidden" value={thread.id} />
             <label>
@@ -710,7 +726,7 @@ function ThreadCard({
         </details>
 
         {thread.status === "resolved" ? (
-          <form action={reopenThreadAction}>
+          <form action={buildWorkspaceActionPath("reopen-thread")} method="post">
             <input name="returnTo" type="hidden" value={currentPath} />
             <input name="threadId" type="hidden" value={thread.id} />
             <button className="secondary-button" type="submit">
@@ -718,7 +734,7 @@ function ThreadCard({
             </button>
           </form>
         ) : (
-          <form action={resolveThreadAction}>
+          <form action={buildWorkspaceActionPath("resolve-thread")} method="post">
             <input name="returnTo" type="hidden" value={currentPath} />
             <input name="threadId" type="hidden" value={thread.id} />
             <button className="secondary-button" type="submit">
@@ -751,7 +767,8 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <section className="summary-card">
+    <section className="summary-card empty-state-card">
+      <p className="eyebrow">Workspace Status</p>
       <h2>{title}</h2>
       <p className="muted-copy">{description}</p>
     </section>
