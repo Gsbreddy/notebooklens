@@ -66,9 +66,20 @@ describe("HomePage", () => {
 
   it("marks the reviewer proof panel as an anchored illustration instead of a detached example thread", async () => {
     const html = await renderHomePage();
+    const statusPills = html.match(/class="status-pill/g) ?? [];
 
     expect(html).toContain("Illustration only");
     expect(html).toContain("Static preview of the latest notebook review workspace");
+    expect(html).toContain(
+      "Status: latest push ready with changed cells, outputs, and 1 open inline comment in view.",
+    );
+    expect(html).toContain("Review target");
+    expect(html).toContain(
+      "sales_forecast.ipynb · changed output plot + markdown diff",
+    );
+    expect(html).toContain("Next action");
+    expect(html).toContain("Open latest push review");
+    expect(statusPills).toHaveLength(0);
     expect(html).toContain("Changed output");
     expect(html).toContain("thread anchored here");
     expect(html).toContain("Open thread");
@@ -76,5 +87,6 @@ describe("HomePage", () => {
       "Attached directly to this changed output before replying on the pull request.",
     );
     expect(html).not.toContain("Example inline comment");
+    expect(html).not.toContain("reviewing latest push");
   });
 });

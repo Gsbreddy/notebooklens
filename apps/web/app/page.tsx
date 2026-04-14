@@ -148,39 +148,29 @@ export default async function HomePage({ searchParams }: PageProps) {
               <div className="landing-checkrun-card">
                 <div className="landing-checkrun-head">
                   <strong>NotebookLens Review Workspace</strong>
-                  <span className="status-pill tone-default">
-                    latest push ready
-                  </span>
                 </div>
-                <p className="landing-checkrun-copy">
-                  changed cells ready · outputs in view · 1 inline comment
+                <p className="landing-checkrun-copy landing-checkrun-status">
+                  Status: latest push ready with changed cells, outputs, and 1
+                  open inline comment in view.
                 </p>
               </div>
 
               <div className="landing-proof-surface">
                 <div className="landing-proof-strip">
-                  <div>
-                    <p className="eyebrow">Workspace preview</p>
+                  <div className="landing-proof-review-target">
+                    <p className="eyebrow">Review target</p>
                     <h3 className="landing-proof-title">
                       acme/forecasting · PR #128
                     </h3>
+                    <p className="landing-proof-target-copy">
+                      sales_forecast.ipynb · changed output plot + markdown
+                      diff
+                    </p>
                   </div>
-                  <div className="landing-proof-meta">
-                    <span className="status-pill tone-default">
-                      reviewing latest push
-                    </span>
-                    <span className="status-pill tone-accent">1 open</span>
-                  </div>
-                </div>
-
-                <div className="landing-proof-grid">
-                  <div className="summary-metric landing-proof-metric">
-                    <span className="summary-label">Notebook</span>
-                    <strong>sales_forecast.ipynb</strong>
-                  </div>
-                  <div className="summary-metric landing-proof-metric">
-                    <span className="summary-label">What changed</span>
-                    <strong>Changed output plot + markdown diff</strong>
+                  <div className="landing-proof-next-action">
+                    <span className="summary-label">Next action</span>
+                    <strong>Open latest push review</strong>
+                    <p>Jump straight to the changed output thread.</p>
                   </div>
                 </div>
 

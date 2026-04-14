@@ -507,8 +507,7 @@ pre {
 }
 
 .landing-checkrun-head,
-.landing-proof-strip,
-.landing-proof-meta {
+.landing-proof-strip {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
@@ -525,6 +524,10 @@ pre {
   margin: 6px 0 0;
 }
 
+.landing-checkrun-status {
+  max-width: 56ch;
+}
+
 .landing-proof-surface {
   display: grid;
   gap: 12px;
@@ -538,23 +541,41 @@ pre {
   border-bottom: 1px solid rgba(36, 39, 45, 0.08);
 }
 
+.landing-proof-review-target {
+  display: grid;
+  gap: 4px;
+  min-width: min(320px, 100%);
+  flex: 1 1 320px;
+}
+
 .landing-proof-title {
   margin: 0;
   font-size: 1.12rem;
   letter-spacing: -0.03em;
 }
 
-.landing-proof-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.landing-proof-target-copy,
+.landing-proof-next-action p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
-.landing-proof-metric {
-  min-width: 0;
-  padding: 10px 12px;
-  background: rgba(255, 254, 250, 0.66);
-  border-color: rgba(36, 39, 45, 0.08);
+.landing-proof-next-action {
+  display: grid;
+  gap: 4px;
+  min-width: min(240px, 100%);
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(197, 90, 36, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 254, 250, 0.92), rgba(247, 217, 197, 0.28)),
+    rgba(255, 254, 250, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(255, 254, 250, 0.62);
+}
+
+.landing-proof-next-action strong {
+  line-height: 1.3;
 }
 
 .landing-proof-list {
@@ -734,11 +755,6 @@ pre {
   border-radius: 999px;
   background: var(--accent);
   transform: translate(-50%, -50%);
-}
-
-.landing-proof-figure .status-pill {
-  font-size: 0.82rem;
-  opacity: 0.82;
 }
 
 .landing-proof-thread {
@@ -1903,7 +1919,6 @@ pre {
     grid-column: auto;
   }
 
-  .landing-proof-grid,
   .two-column-feature-stack,
   .snapshot-overview-stats,
   .review-entry-preview-grid,
