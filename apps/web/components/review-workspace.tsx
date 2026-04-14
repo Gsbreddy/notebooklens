@@ -71,35 +71,36 @@ export function ReviewWorkspace({
 
   return (
     <div className="workspace-shell">
-      <header className="hero-card workspace-header">
-        <div className="hero-copy workspace-header-copy">
+      <header className="summary-card workspace-pr-strip">
+        <div className="workspace-pr-strip-main">
           <p className="workspace-breadcrumb">
             NotebookLens review workspace
           </p>
-          <h1 className="workspace-title">
-            {workspace.review.owner}/{workspace.review.repo} PR #
-            {workspace.review.pull_number}
-          </h1>
-          <p className="hero-summary workspace-lead">
-            Review the notebook changes, outputs, and discussion for this pull request.
-          </p>
+          <div className="workspace-pr-strip-head">
+            <h1 className="workspace-title workspace-title-compact">
+              {workspace.review.owner}/{workspace.review.repo}
+            </h1>
+            <span className="workspace-pr-number">
+              PR #{workspace.review.pull_number}
+            </span>
+            <span className="workspace-pr-installation">
+              {installationLabel}
+            </span>
+          </div>
+        </div>
+        <div className="workspace-pr-strip-meta">
           <div className="hero-meta workspace-meta">
             <StatusPill label={reviewStatusLabel} tone="default" />
             <StatusPill label={selectedSnapshotLabel} tone="default" />
-            <StatusPill label={latestSnapshotLabel} tone="default" />
             <StatusPill
               label={`${workspace.review.thread_counts.unresolved} open`}
               tone="accent"
             />
-            <StatusPill
-              label={`${workspace.review.thread_counts.resolved} resolved`}
-              tone="success"
-            />
-            <StatusPill
-              label={`${workspace.review.thread_counts.outdated} outdated`}
-              tone="warning"
-            />
           </div>
+          <p className="workspace-strip-caption workspace-strip-caption-inline">
+            {latestSnapshotLabel} · {workspace.review.thread_counts.resolved} resolved ·{" "}
+            {workspace.review.thread_counts.outdated} outdated
+          </p>
         </div>
       </header>
 
@@ -131,16 +132,18 @@ export function ReviewWorkspace({
           visibleNotebooks.length > 0 ? (
             <section className="notebook-stack">
               {visibleNotebooks.length > 1 ? (
-                <section className="summary-card notebook-jump-card">
-                  <div className="summary-head">
-                    <div>
-                      <p className="eyebrow">Notebook navigator</p>
-                      <h2>Jump to the next notebook</h2>
-                    </div>
-                    <span className="muted-copy">
-                      {visibleNotebooks.length} changed notebooks
+                <details className="summary-card notebook-jump-card">
+                  <summary className="notebook-jump-summary">
+                    <span>
+                      <strong>Jump between notebooks</strong>
+                      <span className="history-caption notebook-jump-summary-copy">
+                        {visibleNotebooks.length} changed notebooks
+                      </span>
                     </span>
-                  </div>
+                    <span className="muted-copy">
+                      Open navigator
+                    </span>
+                  </summary>
                   <div className="notebook-jump-grid">
                     {visibleNotebooks.map((notebook) => {
                       const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
@@ -167,7 +170,7 @@ export function ReviewWorkspace({
                       );
                     })}
                   </div>
-                </section>
+                </details>
               ) : null}
               {visibleNotebooks.map((notebook) => (
                 <NotebookCard
@@ -350,42 +353,52 @@ function SnapshotOverview({ review, snapshot }: SnapshotOverviewProps) {
       <div className="summary-head snapshot-overview-head">
         <div>
           <p className="eyebrow">PR version {snapshot.snapshot_index}</p>
-          <h2 className="snapshot-overview-title">What changed in this push</h2>
+          <h2 className="snapshot-overview-title">This push at a glance</h2>
+          <p className="summary-text snapshot-summary-kicker">
+            {snapshot.notebook_count} notebook{snapshot.notebook_count === 1 ? "" : "s"} changed ·{" "}
+            {snapshot.changed_cell_count} changed cell
+            {snapshot.changed_cell_count === 1 ? "" : "s"}
+          </p>
         </div>
         <StatusPill
           label={formatSnapshotStatusLabel(snapshot.status)}
           tone={snapshot.status === "failed" ? "danger" : "default"}
         />
       </div>
-      <div className="snapshot-strip snapshot-context-strip">
-        <span>Prepared {formatTimestamp(snapshot.created_at)}</span>
-        <span>
-          {review.base_branch} · {snapshot.base_sha.slice(0, 12)} {"->"} {snapshot.head_sha.slice(0, 12)}
-        </span>
-        <span>{snapshot.notebook_count} notebook{snapshot.notebook_count === 1 ? "" : "s"}</span>
-        <span>{snapshot.changed_cell_count} changed cell{snapshot.changed_cell_count === 1 ? "" : "s"}</span>
-      </div>
       {snapshot.summary_text ? (
         <p className="summary-text snapshot-summary-text">{snapshot.summary_text}</p>
       ) : null}
-      <div className="snapshot-overview-stats">
-        <div className="summary-metric snapshot-metric">
-          <span className="summary-label">PR</span>
-          <strong>#{review.pull_number}</strong>
+      <details className="snapshot-disclosure">
+        <summary>Snapshot details</summary>
+        <div className="snapshot-disclosure-panel">
+          <div className="snapshot-strip snapshot-context-strip">
+            <span>Prepared {formatTimestamp(snapshot.created_at)}</span>
+            <span>
+              {review.base_branch} · {snapshot.base_sha.slice(0, 12)} {"->"} {snapshot.head_sha.slice(0, 12)}
+            </span>
+          </div>
+          <div className="snapshot-overview-stats">
+            <div className="summary-metric snapshot-metric">
+              <span className="summary-label">PR</span>
+              <strong>#{review.pull_number}</strong>
+            </div>
+            <div className="summary-metric snapshot-metric">
+              <span className="summary-label">Compared against</span>
+              <strong>{review.base_branch}</strong>
+            </div>
+            <div className="summary-metric snapshot-metric">
+              <span className="summary-label">Latest commit in view</span>
+              <strong>{snapshot.head_sha.slice(0, 12)}</strong>
+            </div>
+            <div className="summary-metric snapshot-metric">
+              <span className="summary-label">Thread status</span>
+              <strong>
+                {review.thread_counts.unresolved} open · {review.thread_counts.resolved} resolved
+              </strong>
+            </div>
+          </div>
         </div>
-        <div className="summary-metric snapshot-metric">
-          <span className="summary-label">Compared against</span>
-          <strong>{review.base_branch}</strong>
-        </div>
-        <div className="summary-metric snapshot-metric">
-          <span className="summary-label">Latest commit in view</span>
-          <strong>{snapshot.head_sha.slice(0, 12)}</strong>
-        </div>
-        <div className="summary-metric snapshot-metric">
-          <span className="summary-label">Open threads</span>
-          <strong>{review.thread_counts.unresolved}</strong>
-        </div>
-      </div>
+      </details>
     </section>
   );
 }
