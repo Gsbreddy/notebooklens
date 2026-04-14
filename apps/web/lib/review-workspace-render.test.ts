@@ -435,8 +435,14 @@ describe("review workspace rendering", () => {
     expect(markup).toContain("Check the staged benchmark inputs before merging.");
     expect(markup).toContain("Validation accuracy regressed in the benchmark output.");
     expect(markup).toContain("Confirm whether the metric drop is expected for this push.");
-    expect(markup).toContain("Notebook summary");
+    expect(markup).toContain("First changed row: Cell 2. Metric output changed.");
+    expect(markup).toContain("1 open thread.");
+    expect(markup).toContain("1 notebook note.");
+    expect(markup).toContain("Notebook notes");
     expect(markup).toContain("Re-run this notebook after refreshing the staged fixture data.");
+    expect(markup).not.toContain("Review items");
+    expect(markup).not.toContain("Inline threads");
+    expect(markup).not.toContain("PR version</span><strong>#2</strong>");
     expect(markup).toContain("Session &amp; review settings");
     expect(markup).toContain("Open LiteLLM settings");
   });

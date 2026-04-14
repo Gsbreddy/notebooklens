@@ -753,18 +753,12 @@ pre {
   font-size: 0.92rem;
 }
 
-.notebook-stats {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 12px;
-}
-
-.notebook-stat {
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--panel-strong);
-  border: 1px solid var(--line);
+.notebook-review-summary {
+  margin: 8px 0 12px;
+  max-width: 78ch;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.55;
 }
 
 .notebook-summary-panel,
@@ -781,12 +775,6 @@ pre {
 .notebook-summary-section + .notebook-summary-section {
   padding-top: 12px;
   border-top: 1px solid rgba(36, 39, 45, 0.08);
-}
-
-.notebook-thread-stats {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .chip-list,
@@ -1301,9 +1289,7 @@ pre {
   }
 
   .two-column-feature-stack,
-  .notebook-stats,
-  .snapshot-overview-stats,
-  .notebook-thread-stats {
+  .snapshot-overview-stats {
     grid-template-columns: 1fr;
   }
 

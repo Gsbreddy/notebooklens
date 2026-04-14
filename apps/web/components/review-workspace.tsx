@@ -452,19 +452,19 @@ function NotebookCard({
 }: NotebookCardProps) {
   const [directoryLabel, fileLabel] = splitNotebookPath(notebook.path);
   const notebookThreads = getThreadsForNotebook(notebook, threadsByAnchor);
-  const threadCount = notebookThreads.length;
   const openThreadCount = notebookThreads.filter((thread) => thread.status === "open").length;
-  const resolvedThreadCount = notebookThreads.filter((thread) => thread.status === "resolved").length;
-  const outdatedThreadCount = notebookThreads.filter((thread) => thread.status === "outdated").length;
   const visibleRows = notebook.render_rows.filter((row) => hasVisibleBlocks(row, threadsByAnchor));
   const notebookSectionId = buildNotebookSectionId(notebook.path);
-  const notebookSummaryLabel = buildNotebookSummaryLabel({
+  const notebookReviewSummary = buildNotebookReviewSummary({
+    firstVisibleRow: visibleRows[0] ?? null,
+    reviewItemCount: visibleRows.length,
     noticeCount: notebook.notices.length,
     openThreadCount,
-    resolvedThreadCount,
-    outdatedThreadCount,
-    totalThreadCount: threadCount,
   });
+  const notebookNotesLabel = `${notebook.notices.length} notebook ${pluralize(
+    notebook.notices.length,
+    "note",
+  )}`;
 
   return (
     <section className="notebook-card notebook-card-flat" id={notebookSectionId}>
@@ -476,65 +476,29 @@ function NotebookCard({
         <StatusPill label={formatChangeTypeLabel(notebook.change_type)} tone="default" />
       </div>
 
-      <div className="notebook-stats">
-        <div className="notebook-stat">
-          <span className="summary-label">Review items</span>
-          <strong>{visibleRows.length}</strong>
-        </div>
-        <div className="notebook-stat">
-          <span className="summary-label">Inline threads</span>
-          <strong>{threadCount}</strong>
-        </div>
-        <div className="notebook-stat">
-          <span className="summary-label">PR version</span>
-          <strong>#{snapshot.snapshot_index}</strong>
-        </div>
-      </div>
+      <p className="notebook-review-summary">{notebookReviewSummary}</p>
 
-      {notebookSummaryLabel ? (
+      {notebook.notices.length ? (
         <details className="notebook-summary-card">
           <summary className="notebook-summary-toggle">
             <span>
-              <strong>Notebook summary</strong>
+              <strong>Notebook notes</strong>
               <span className="history-caption notebook-jump-summary-copy">
-                {notebookSummaryLabel}
+                {notebookNotesLabel}
               </span>
             </span>
-            <span className="muted-copy">Expand</span>
+            <span className="muted-copy">Open only if needed</span>
           </summary>
           <div className="notebook-summary-panel">
-            {notebook.notices.length ? (
-              <div className="notebook-summary-section">
-                <p className="sidebar-subtitle">Notebook notes</p>
-                <ul className="chip-list">
-                  {notebook.notices.map((notice) => (
-                    <li className="chip-item" key={notice}>
-                      {notice}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {threadCount ? (
-              <div className="notebook-summary-section">
-                <p className="sidebar-subtitle">Thread status</p>
-                <div className="notebook-thread-stats">
-                  <div className="notebook-stat">
-                    <span className="summary-label">Open</span>
-                    <strong>{openThreadCount}</strong>
-                  </div>
-                  <div className="notebook-stat">
-                    <span className="summary-label">Resolved</span>
-                    <strong>{resolvedThreadCount}</strong>
-                  </div>
-                  <div className="notebook-stat">
-                    <span className="summary-label">Outdated</span>
-                    <strong>{outdatedThreadCount}</strong>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            <div className="notebook-summary-section">
+              <ul className="chip-list">
+                {notebook.notices.map((notice) => (
+                  <li className="chip-item" key={notice}>
+                    {notice}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </details>
       ) : null}
@@ -1279,38 +1243,48 @@ function buildThreadComposerId(anchor: ThreadAnchor): string {
 }
 
 
-function buildNotebookSummaryLabel({
+function buildNotebookReviewSummary({
+  firstVisibleRow,
+  reviewItemCount,
   noticeCount,
   openThreadCount,
-  resolvedThreadCount,
-  outdatedThreadCount,
-  totalThreadCount,
 }: {
+  firstVisibleRow: RenderRow | null;
+  reviewItemCount: number;
   noticeCount: number;
   openThreadCount: number;
-  resolvedThreadCount: number;
-  outdatedThreadCount: number;
-  totalThreadCount: number;
 }): string | null {
-  const parts: string[] = [];
+  const sentences: string[] = [];
 
-  if (noticeCount > 0) {
-    parts.push(`${noticeCount} ${pluralize(noticeCount, "note")}`);
+  if (firstVisibleRow) {
+    const firstRowSummary = firstVisibleRow.summary.trim();
+    const firstRowLabel = formatCellLabel(firstVisibleRow);
+    sentences.push(
+      firstRowSummary
+        ? `First changed row: ${firstRowLabel}. ${firstRowSummary}`
+        : `First changed row: ${firstRowLabel}.`,
+    );
+    if (reviewItemCount > 1) {
+      const remainingCount = reviewItemCount - 1;
+      sentences.push(`${remainingCount} more ${pluralize(remainingCount, "changed row")}.`);
+    }
+  } else if (noticeCount > 0) {
+    sentences.push(`Notebook notes only. ${noticeCount} ${pluralize(noticeCount, "note")}.`);
   }
+
   if (openThreadCount > 0) {
-    parts.push(`${openThreadCount} open ${pluralize(openThreadCount, "thread")}`);
-  }
-  if (resolvedThreadCount > 0) {
-    parts.push(`${resolvedThreadCount} resolved`);
-  }
-  if (outdatedThreadCount > 0) {
-    parts.push(`${outdatedThreadCount} outdated`);
-  }
-  if (parts.length === 0 && totalThreadCount > 0) {
-    parts.push(`${totalThreadCount} ${pluralize(totalThreadCount, "thread")}`);
+    sentences.push(`${openThreadCount} open ${pluralize(openThreadCount, "thread")}.`);
   }
 
-  return parts.length ? parts.join(" · ") : null;
+  if (noticeCount > 0 && firstVisibleRow) {
+    sentences.push(`${noticeCount} notebook ${pluralize(noticeCount, "note")}.`);
+  }
+
+  if (sentences.length === 0) {
+    return "Notebook change ready for review.";
+  }
+
+  return sentences.join(" ");
 }
 
 
