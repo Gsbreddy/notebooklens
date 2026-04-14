@@ -527,6 +527,104 @@ pre {
   margin: 8px 0 0;
 }
 
+.review-entry-stage {
+  min-height: 100vh;
+  padding: 18px 0 36px;
+}
+
+.review-entry-shell {
+  padding-top: 0;
+}
+
+.review-entry-banner,
+.review-entry-sidecard,
+.review-entry-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.review-entry-banner {
+  grid-template-columns: minmax(0, 1.25fr) auto;
+  align-items: center;
+}
+
+.review-entry-banner-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.review-entry-title,
+.review-entry-preview h2,
+.review-entry-sidecard h2 {
+  margin: 0;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.review-entry-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+}
+
+.review-entry-summary {
+  margin: 0;
+}
+
+.review-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.review-entry-preview-head {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.review-entry-preview-grid,
+.review-entry-sidegrid {
+  display: grid;
+  gap: 12px;
+}
+
+.review-entry-preview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-entry-preview-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(36, 39, 45, 0.08);
+  background: var(--panel-strong);
+}
+
+.review-entry-preview-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.review-entry-preview-panel p {
+  margin: 0;
+}
+
+.review-entry-sidegrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.review-entry-metric {
+  min-width: 0;
+}
+
+.review-entry-metric strong {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
 .wall-card {
   display: grid;
   gap: 18px;
@@ -1503,7 +1601,9 @@ pre {
 
   .landing-proof-grid,
   .two-column-feature-stack,
-  .snapshot-overview-stats {
+  .snapshot-overview-stats,
+  .review-entry-preview-grid,
+  .review-entry-sidegrid {
     grid-template-columns: 1fr;
   }
 
@@ -1542,6 +1642,14 @@ pre {
     padding: 12px;
   }
 
+  .review-entry-stage {
+    padding-top: 10px;
+  }
+
+  .review-entry-banner {
+    grid-template-columns: 1fr;
+  }
+
   .diff-block-flat {
     border-left: 0;
     border-top: 1px solid rgba(36, 39, 45, 0.08);
@@ -1561,12 +1669,14 @@ pre {
   }
 
   .wall-actions,
-  .landing-actions {
+  .landing-actions,
+  .review-entry-actions {
     width: 100%;
   }
 
   .wall-actions > *,
-  .landing-actions > * {
+  .landing-actions > *,
+  .review-entry-actions > * {
     width: 100%;
   }
 }

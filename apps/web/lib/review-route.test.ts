@@ -71,7 +71,7 @@ beforeEach(() => {
 
 
 describe("ReviewRoute", () => {
-  it("renders repo and pull request context on the latest-review auth wall", async () => {
+  it("renders a review-first auth interstitial for the latest review route", async () => {
     apiMocks.getReviewWorkspace.mockRejectedValue(
       new ApiRequestError(401, "Unauthorized"),
     );
@@ -90,16 +90,25 @@ describe("ReviewRoute", () => {
       7,
     );
     expect(html).toContain("octo-org/notebooklens · PR #7");
-    expect(html).toContain("Continue to octo-org/notebooklens · PR #7");
+    expect(html).toContain("NotebookLens review workspace");
+    expect(html).toContain("Sign-in required");
     expect(html).toContain(
+      "Continue straight into changed cells, outputs, and threads",
+    );
+    expect(html).toContain("Changed cells stay front and center");
+    expect(html).toContain("Continue to octo-org/notebooklens · PR #7");
+    expect(html).not.toContain(
       "Use the GitHub account that can already open octo-org/notebooklens.",
+    );
+    expect(html).not.toContain(
+      "Make sure the NotebookLens GitHub App is installed on this repository.",
     );
     expect(html).toContain(
       "next_path=%2Freviews%2Focto-org%2Fnotebooklens%2Fpulls%2F7",
     );
   });
 
-  it("keeps snapshot identity in the auth wall for saved-push routes", async () => {
+  it("keeps snapshot identity visible in the auth interstitial for saved-push routes", async () => {
     apiMocks.getSnapshotWorkspace.mockRejectedValue(
       new ApiRequestError(401, "Unauthorized"),
     );
@@ -120,6 +129,7 @@ describe("ReviewRoute", () => {
       3,
     );
     expect(html).toContain("octo-org/notebooklens · PR #7 · Push 3");
+    expect(html).toContain("Push 3 snapshot");
     expect(html).toContain(
       "Continue to octo-org/notebooklens · PR #7 · Push 3",
     );

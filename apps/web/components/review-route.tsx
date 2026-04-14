@@ -79,34 +79,129 @@ function AuthWall({
     snapshotIndex === undefined
       ? reviewIdentity
       : `${reviewIdentity} · Push ${snapshotIndex}`;
+  const destinationLabel =
+    snapshotIndex === undefined
+      ? "Latest review workspace"
+      : `Push ${snapshotIndex} snapshot`;
 
   return (
-    <main className="center-stage">
-      <section className="hero-card compact-card wall-card">
-        <p className="eyebrow">Review access</p>
-        <h1>{reviewContext}</h1>
-        <p className="hero-summary">
-          Sign in with GitHub so NotebookLens can confirm your access to this pull
-          request review and bring you back to the same workspace page.
-        </p>
-        <ul className="wall-list">
-          <li>Use the GitHub account that can already open {owner}/{repo}.</li>
-          <li>Make sure the NotebookLens GitHub App is installed on this repository.</li>
-          <li>Reopen the `NotebookLens Review Workspace` check run when you want the fastest path back here.</li>
-        </ul>
-        <p className="muted-copy">
-          After sign-in, NotebookLens continues directly to this review instead of
-          sending you to a generic landing page.
-        </p>
-        <div className="wall-actions">
-          <a className="primary-button" href={buildLoginHref(currentPath)}>
-            Continue to {reviewContext}
-          </a>
-          <Link className="secondary-button" href="/">
-            Back to home
-          </Link>
+    <main className="review-entry-stage">
+      <div className="workspace-shell review-entry-shell">
+        <header className="summary-card workspace-pr-strip">
+          <div className="workspace-pr-strip-main">
+            <p className="workspace-breadcrumb">NotebookLens review workspace</p>
+            <div className="workspace-pr-strip-head">
+              <h1 className="workspace-title workspace-title-compact">
+                {owner}/{repo}
+              </h1>
+              <span className="workspace-pr-number">PR #{pullNumber}</span>
+            </div>
+          </div>
+          <div className="workspace-pr-strip-meta">
+            <div className="hero-meta workspace-meta">
+              <span className="status-pill tone-accent">Sign-in required</span>
+              <span className="status-pill tone-default">{destinationLabel}</span>
+              <span className="status-pill tone-default">Direct review link</span>
+            </div>
+            <p className="workspace-strip-caption workspace-strip-caption-inline">
+              NotebookLens returns to this exact review route immediately after GitHub
+              access is confirmed.
+            </p>
+          </div>
+        </header>
+
+        <div className="workspace-grid">
+          <section className="workspace-main">
+            <section className="summary-card review-entry-banner">
+              <div className="review-entry-banner-copy">
+                <p className="eyebrow">Open the review</p>
+                <h2 className="review-entry-title">
+                  Continue straight into changed cells, outputs, and threads
+                </h2>
+                <p className="hero-summary review-entry-summary">
+                  This direct link already targets {reviewContext}. Sign in with GitHub
+                  once and NotebookLens brings you back to the review surface instead of
+                  a generic setup page.
+                </p>
+              </div>
+              <div className="review-entry-actions">
+                <a className="primary-button" href={buildLoginHref(currentPath)}>
+                  Continue to {reviewContext}
+                </a>
+                <Link className="secondary-button" href="/">
+                  Back to home
+                </Link>
+              </div>
+            </section>
+
+            <section className="notebook-card review-entry-preview">
+              <div className="notebook-head review-entry-preview-head">
+                <div>
+                  <p className="eyebrow">Review surface</p>
+                  <h2>Changed cells stay front and center</h2>
+                  <p className="hero-summary review-entry-summary">
+                    PR context stays visible here so the next step still feels like
+                    entering the notebook review, not setting it up.
+                  </p>
+                </div>
+                <div className="hero-meta">
+                  <span className="status-pill tone-accent">Changed cells</span>
+                  <span className="status-pill tone-default">Outputs</span>
+                  <span className="status-pill tone-default">Threads</span>
+                </div>
+              </div>
+
+              <div className="review-entry-preview-grid">
+                <article className="review-entry-preview-panel">
+                  <p className="summary-label">Changed cells</p>
+                  <h3>Notebook diffs are the dominant destination.</h3>
+                  <p className="muted-copy">
+                    The handoff ends with cell-level changes in view instead of a
+                    setup checklist.
+                  </p>
+                </article>
+                <article className="review-entry-preview-panel">
+                  <p className="summary-label">Rendered outputs</p>
+                  <h3>Output changes remain nearby.</h3>
+                  <p className="muted-copy">
+                    Reviewers can keep execution results and visual output context in
+                    the same flow.
+                  </p>
+                </article>
+                <article className="review-entry-preview-panel">
+                  <p className="summary-label">Discussion threads</p>
+                  <h3>Comments reconnect to the notebook.</h3>
+                  <p className="muted-copy">
+                    Open threads return as anchored review items instead of a separate
+                    destination to rediscover.
+                  </p>
+                </article>
+              </div>
+            </section>
+          </section>
+
+          <aside className="workspace-sidebar">
+            <section className="side-card review-entry-sidecard">
+              <p className="eyebrow">Direct review link</p>
+              <h2>{reviewContext}</h2>
+              <p className="muted-copy">
+                NotebookLens only pauses here long enough to verify GitHub access for
+                this pull request, then returns you to the same review route.
+              </p>
+              <div className="review-entry-sidegrid">
+                <div className="summary-metric review-entry-metric">
+                  <span className="summary-label">Return target</span>
+                  <strong>{destinationLabel}</strong>
+                </div>
+                <div className="summary-metric review-entry-metric">
+                  <span className="summary-label">Review focus</span>
+                  <strong>Cells, outputs, and threads</strong>
+                </div>
+              </div>
+            </section>
+          </aside>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
