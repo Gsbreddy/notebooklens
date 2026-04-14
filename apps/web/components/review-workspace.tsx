@@ -14,6 +14,7 @@ import {
   canStartThread,
   formatCellLabel,
   getMeaningfulOutputItems,
+  getRowSignalSummary,
   getVisibleBlockKinds,
   groupThreadsByAnchor,
   hasMeaningfulBlockContent,
@@ -582,23 +583,25 @@ function CellRowCard({
   onToggleComposer,
 }: CellRowCardProps) {
   const blocks = getVisibleBlockKinds(row, threadsByAnchor);
-  const changedBlockCount = blocks.filter((blockKind) => isBlockChanged(row, blockKind)).length;
+  const changedBlockKinds = blocks.filter((blockKind) => isBlockChanged(row, blockKind));
+  const rowSummary = getRowSignalSummary(row);
 
   return (
     <article className="cell-card cell-card-flat">
-      <div className="cell-card-head">
-        <div>
-          <p className="eyebrow">{formatCellLabel(row)}</p>
-          <h3>
-            {formatCellTypeLabel(row.cell_type)} · {formatRowChangeLabel(row.change_type)}
-          </h3>
-        </div>
-        <div className="cell-card-meta">
-          <StatusPill
-            label={`${changedBlockCount} changed block${changedBlockCount === 1 ? "" : "s"}`}
-            tone="default"
-          />
-          <p className="cell-summary">{row.summary}</p>
+      <div className="cell-card-head cell-card-head-compact">
+        <h3 className="cell-row-heading">
+          <span>{formatCellLabel(row)}</span>
+          <span className="cell-row-heading-divider">·</span>
+          <span className="cell-row-heading-detail">{formatCellTypeLabel(row.cell_type)}</span>
+        </h3>
+        <div className="cell-card-meta cell-card-meta-inline">
+          <StatusPill label={formatRowChangeLabel(row.change_type)} tone="default" />
+          {changedBlockKinds.length ? (
+            <span className="cell-inline-summary">
+              {changedBlockKinds.map((blockKind) => blockTitle(blockKind)).join(" + ")}
+            </span>
+          ) : null}
+          {rowSummary ? <span className="cell-inline-summary">{rowSummary}</span> : null}
         </div>
       </div>
 
@@ -624,14 +627,12 @@ function CellRowCard({
           return (
             <section className="diff-block diff-block-flat" key={blockKind}>
               <div className="diff-block-head">
-                <div>
-                  <h4>{blockTitle(blockKind)}</h4>
-                </div>
+                <h4>{blockTitle(blockKind)}</h4>
                 <div className="diff-block-meta">
                   {isBlockChanged(row, blockKind) ? (
-                    <StatusPill label="changed here" tone="accent" />
+                    <StatusPill label="changed" tone="accent" />
                   ) : (
-                    <StatusPill label="discussion only" tone="default" />
+                    <StatusPill label="threads only" tone="default" />
                   )}
                   {threads.length ? (
                     <StatusPill label={`${threads.length} thread${threads.length === 1 ? "" : "s"}`} tone="default" />
@@ -1080,12 +1081,12 @@ function EmptyState({
 
 function blockTitle(blockKind: SnapshotBlockKind): string {
   if (blockKind === "source") {
-    return "Code changes";
+    return "Code";
   }
   if (blockKind === "outputs") {
-    return "Output changes";
+    return "Outputs";
   }
-  return "Metadata changes";
+  return "Metadata";
 }
 
 

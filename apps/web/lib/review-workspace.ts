@@ -109,6 +109,47 @@ export function getMeaningfulOutputItems(
 }
 
 
+export function getChangedBlockKinds(row: RenderRow): SnapshotBlockKind[] {
+  return (["source", "outputs", "metadata"] as const).filter((blockKind) =>
+    isBlockChanged(row, blockKind),
+  );
+}
+
+
+export function getRowSignalSummary(row: RenderRow): string | null {
+  const summary = row.summary.trim();
+  if (!summary) {
+    return null;
+  }
+
+  const normalizedSummary = normalizeSummary(summary);
+  if (!normalizedSummary) {
+    return null;
+  }
+
+  const changedBlockLabels = getChangedBlockKinds(row).map((blockKind) =>
+    blockKind === "metadata" ? "material metadata" : blockKind,
+  );
+
+  const genericSummaries = new Set([
+    "cell added",
+    "cell deleted",
+    "cell modified",
+    "cell outputs changed",
+    "cell reordered without material content changes",
+  ]);
+
+  if (
+    genericSummaries.has(normalizedSummary) ||
+    normalizedSummary === `cell modified (${changedBlockLabels.join(", ")})`
+  ) {
+    return null;
+  }
+
+  return summary;
+}
+
+
 export function isBlockChanged(
   row: RenderRow,
   blockKind: ThreadAnchor["block_kind"],
@@ -292,6 +333,14 @@ function firstValue(value: string | string[] | undefined): string | null {
     return value[0] ?? null;
   }
   return value ?? null;
+}
+
+
+function normalizeSummary(summary: string): string {
+  return summary
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "");
 }
 
 

@@ -6,7 +6,9 @@ import {
   buildFlashRedirect,
   buildWorkspaceActionPath,
   canStartThread,
+  getChangedBlockKinds,
   getMeaningfulOutputItems,
+  getRowSignalSummary,
   getVisibleBlockKinds,
   groupThreadsByAnchor,
   hasMeaningfulBlockContent,
@@ -267,6 +269,20 @@ describe("review workspace helpers", () => {
     };
 
     expect(getMeaningfulOutputItems(row)).toEqual([row.outputs.items[1]]);
+  });
+
+  it("returns the changed block kinds for compact row headers", () => {
+    expect(getChangedBlockKinds(buildRow())).toEqual(["outputs"]);
+  });
+
+  it("suppresses generic row summaries that only repeat diff metadata", () => {
+    const genericRow = {
+      ...buildRow(),
+      summary: "cell modified (outputs)",
+    };
+
+    expect(getRowSignalSummary(genericRow)).toBeNull();
+    expect(getRowSignalSummary(buildRow())).toBe("Metric output changed.");
   });
 
   it("builds the review-scoped LiteLLM settings route", () => {
